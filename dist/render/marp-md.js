@@ -35,8 +35,14 @@ const columnsHtml = (slide) => {
 };
 const slideMarkdown = (slide) => {
     const lines = [`<!-- _class: ${slide.layout} -->`];
-    if (slide.title !== undefined)
-        lines.push(titleLine(slide));
+    if (slide.title !== undefined) {
+        const title = titleLine(slide);
+        lines.push(title);
+        /* A shrunk title is a raw <h1> HTML block; without a blank line CommonMark
+           swallows every following line into it and the bullet list disappears. */
+        if (title.startsWith('<h1'))
+            lines.push('');
+    }
     if (slide.columns !== undefined) {
         lines.push('', columnsHtml(slide));
         if (slide.source !== undefined)

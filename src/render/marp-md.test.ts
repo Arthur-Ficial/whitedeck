@@ -17,4 +17,10 @@ describe('toMarpMarkdown', () => {
     expect(Number(h1?.[1])).toBeLessThan(112);
     expect(Number(h1?.[1])).toBeGreaterThanOrEqual(40);
   });
+
+  it('keeps bullets as a markdown list after a shrunk HTML title (blank line ends the HTML block)', () => {
+    const long = 'This headline is far too long to fit the Keynote title box at full size';
+    const md = toMarpMarkdown(parseDeck(`<!-- _class: title-bullets -->\n# ${long}\n- first bullet\n- second bullet`));
+    expect(md).toMatch(/<\/h1>\n\n- first bullet/);
+  });
 });
