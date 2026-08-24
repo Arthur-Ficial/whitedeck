@@ -1,0 +1,45 @@
+export type PlaceholderRole = 'title' | 'body' | 'pic' | 'sldNum';
+
+export type TextAlign = 'left' | 'center' | 'right' | 'justify';
+
+export interface ThemePlaceholder {
+  readonly role: PlaceholderRole;
+  readonly idx?: number;
+  readonly xEmu: number;
+  readonly yEmu: number;
+  readonly wEmu: number;
+  readonly hEmu: number;
+  readonly xPx: number;
+  readonly yPx: number;
+  readonly wPx: number;
+  readonly hPx: number;
+  readonly sizePt: number;
+  readonly font: string;
+  readonly color: string;
+  readonly align: TextAlign;
+  readonly bullet?: string;
+}
+
+export interface ThemeLayout {
+  readonly keynoteName: string;
+  readonly placeholders: readonly ThemePlaceholder[];
+}
+
+export interface ThemeCanvas {
+  readonly widthEmu: number;
+  readonly heightEmu: number;
+  readonly widthPx: number;
+  readonly heightPx: number;
+}
+
+export interface Theme {
+  readonly name: string;
+  readonly canvas: ThemeCanvas;
+  readonly background: string;
+  readonly fonts: { readonly regular: string; readonly medium: string; readonly light: string };
+  readonly layouts: Readonly<Record<string, ThemeLayout>>;
+}
+
+export const EMU_PER_PX = 9525;
+
+export const emuToPx = (emu: number): number => Math.round(emu / EMU_PER_PX);

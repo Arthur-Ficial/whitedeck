@@ -1,0 +1,62 @@
+{
+  "name": "whitedeck",
+  "version": "0.1.0",
+  "description": "Keynote-quality white slides from markdown - md to HTML, PDF, editable PPTX and native Keynote .key",
+  "keywords": [
+    "keynote",
+    "slides",
+    "presentation",
+    "markdown",
+    "marp",
+    "pptx",
+    "mcp",
+    "ai"
+  ],
+  "license": "MIT",
+  "author": "Franz Enzenhofer",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/franzenzenhofer/whitedeck.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "whitedeck": "dist/cli.js",
+    "whitedeck-mcp": "dist/mcp/server.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.build.json && chmod +x dist/cli.js dist/mcp/server.js",
+    "gates": "npm run typecheck && npm run lint && npm run test && npm run build"
+  },
+  "dependencies": {
+    "@marp-team/marp-cli": "^4.2.3",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "gray-matter": "^4.0.3",
+    "pptxgenjs": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "eslint": "^9.30.0",
+    "jszip": "^3.10.1",
+    "pdf-lib": "^1.17.1",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.40.0",
+    "vitest": "^3.2.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
