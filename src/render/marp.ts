@@ -31,6 +31,7 @@ export const runMarp = async (deck: Deck, outPath: string, extraArgs: readonly s
       '--theme-set',
       themePath,
       '--allow-local-files',
+      '--html',
       '--no-stdin',
       '-o',
       resolve(outPath),

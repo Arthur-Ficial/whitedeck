@@ -26,6 +26,13 @@ const DEMO_MD = [
   '<!-- _class: quote -->',
   '> "Simplicity is the ultimate sophistication."',
   '> -- Leonardo da Vinci',
+  '',
+  '---',
+  '',
+  '# Links work',
+  '- see [the docs](https://example.com/docs)',
+  '',
+  'Source: [GSC](https://search.google.com/search-console)',
 ].join('\n');
 
 describe('renderHtml (real marp-cli)', () => {
@@ -43,5 +50,7 @@ describe('renderHtml (real marp-cli)', () => {
     expect(html).toContain('Leonardo da Vinci');
     expect(html).toMatch(/width:\s*2560px/);
     expect(html).toMatch(/font-size:\s*112pt/);
+    expect(html).toContain('href="https://example.com/docs"');
+    expect(html).toMatch(/<footer>.*search-console.*<\/footer>/);
   });
 });

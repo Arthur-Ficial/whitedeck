@@ -47,6 +47,27 @@ describe('themeCss', () => {
     expect(photoTitle).toContain('justify-content: flex-end');
   });
 
+  it('lays out compare columns side by side in the title-bullets body box', () => {
+    const body = whiteTheme.layouts['title-bullets'].placeholders.find((p) => p.role === 'body');
+    if (!body) throw new Error('missing body');
+    const cols = /section\.compare \.cols\s*{[^}]*}/.exec(css)?.[0] ?? '';
+    expect(cols).toContain(`left: ${body.xPx}px`);
+    expect(cols).toContain(`top: ${body.yPx}px`);
+    expect(cols).toContain('display: flex');
+    expect(css).toContain('section.compare .col ');
+  });
+
+  it('styles links blue and underlined and pins source footers to the bottom', () => {
+    expect(css).toMatch(/section a\s*{[^}]*color:\s*#0000EE/);
+    expect(css).toMatch(/section a\s*{[^}]*text-decoration:\s*underline/);
+    expect(css).toMatch(/section footer\s*{[^}]*position:\s*absolute/);
+    expect(css).toMatch(/section footer\s*{[^}]*font-size:\s*24pt/);
+  });
+
+  it('resets user-agent list padding so bullets sit at the Keynote box edge', () => {
+    expect(css).toMatch(/section\.title-bullets ul\s*{[^}]*padding:\s*0/);
+  });
+
   it('applies Keynote paragraph spacing and bullet scale to bullet layouts', () => {
     expect(css).toMatch(/section\.title-bullets li \+ li\s*{[^}]*margin-top:\s*59pt/);
     expect(css).toMatch(/section\.title-bullets li::before\s*{[^}]*font-size:\s*125%/);

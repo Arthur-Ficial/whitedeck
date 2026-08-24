@@ -17,7 +17,9 @@ const DEMO_MD = [
   '<!-- _class: title-bullets -->',
   '# Agenda',
   '- First',
-  '- Second',
+  '- See [docs](https://example.com/docs)',
+  '',
+  'Source: [GSC](https://search.google.com/sc)',
 ].join('\n');
 
 const emuOf = (xml: string, shapeIndex: number): { x: number; y: number; cx: number; cy: number } => {
@@ -60,10 +62,33 @@ describe('renderPptx (native editable OOXML)', () => {
     expect(slide2).toMatch(/<a:spcBef><a:spcPts val="5900"\/>/);
     expect(slide2).toContain('typeface="Helvetica Neue"');
 
+    const rels2 = await zip.file('ppt/slides/_rels/slide2.xml.rels')?.async('string');
+    expect(rels2).toContain('https://example.com/docs');
+    expect(rels2).toContain('https://search.google.com/sc');
+    expect(slide2).toContain('Source:');
+
     const slide1 = await zip.file('ppt/slides/slide1.xml')?.async('string');
     expect(slide1).toMatch(/anchor="b"/);
     expect(slide1).toContain('Hello Keynote');
     expect(slide1).toContain('A subtitle');
+  });
+
+  it('renders compare slides as two half-width text boxes', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'whitedeck-pptx-'));
+    const outPath = join(outDir, 'compare.pptx');
+    await renderPptx(
+      parseDeck('<!-- _class: compare -->\n# Faster\n- **Before**\n- LCP 4.1s\n- **After**\n- LCP 1.3s'),
+      outPath,
+    );
+    const zip = await JSZip.loadAsync(readFileSync(outPath));
+    const slide1 = await zip.file('ppt/slides/slide1.xml')?.async('string');
+    if (slide1 === undefined) throw new Error('slide1 missing');
+    const left = emuOf(slide1, 1);
+    const right = emuOf(slide1, 2);
+    expect(left.cx).toBe(right.cx);
+    expect(right.x).toBeGreaterThan(left.x + left.cx - 1);
+    expect(slide1).toContain('Before');
+    expect(slide1).toContain('LCP 4.1s');
   });
 
   it('writes real text (editable), not slide images', async () => {

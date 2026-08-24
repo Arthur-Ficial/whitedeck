@@ -86,6 +86,29 @@ describe('parseDeck', () => {
     expect(deck.slides[0]?.bullets[0]?.text).toBe('run npx whitedeck now');
   });
 
+  it('captures a trailing Source: line separately from bullets', () => {
+    const deck = parseDeck('# T\n- point\n\nSource: [GSC](https://search.google.com/search-console)');
+    expect(deck.slides[0]?.bullets).toHaveLength(1);
+    expect(deck.slides[0]?.source).toBe('Source: [GSC](https://search.google.com/search-console)');
+  });
+
+  it('keeps markdown links intact inside bullets', () => {
+    const deck = parseDeck('# T\n- see [the docs](https://example.com)');
+    expect(deck.slides[0]?.bullets[0]?.text).toBe('see [the docs](https://example.com)');
+  });
+
+  it('groups compare slides into side-by-side columns at bold-only bullets', () => {
+    const deck = parseDeck(
+      '<!-- _class: compare -->\n# Faster\n- **Before**\n- LCP 4.1s\n- 2.3 MB JS\n- **After**\n- LCP 1.3s\n- 0.6 MB JS',
+    );
+    const slide = deck.slides[0];
+    expect(slide?.layout).toBe('compare');
+    expect(slide?.columns).toHaveLength(2);
+    expect(slide?.columns?.[0]).toMatchObject({ header: 'Before' });
+    expect(slide?.columns?.[0]?.bullets.map((b) => b.text)).toEqual(['LCP 4.1s', '2.3 MB JS']);
+    expect(slide?.columns?.[1]).toMatchObject({ header: 'After' });
+  });
+
   it('fails fast on unknown layout names', () => {
     expect(() => parseDeck('<!-- _class: does-not-exist -->\n# X')).toThrow(/does-not-exist/);
   });

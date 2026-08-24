@@ -49,6 +49,21 @@ author: Franz Enzenhofer
 
 ---
 
+<!-- _class: compare -->
+
+# Editable beats image-export decks
+
+- **Image-based tools**
+- Text locked in pixels
+- No edits after export
+- **whitedeck**
+- Real text, real placeholders
+- Open and edit in [Keynote](https://www.apple.com/keynote/)
+
+Source: [whitedeck on GitHub](https://github.com/franzenzenhofer/whitedeck)
+
+---
+
 <!-- _class: quote -->
 
 > "Simplicity is the ultimate sophistication."

@@ -55,7 +55,7 @@ describe('whitedeck CLI (built artifact, end to end)', () => {
   it('validates a good deck with exit 0 and machine-readable output', async () => {
     const { code, stdout } = await runCli(['validate', DEMO]);
     expect(code).toBe(0);
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, slides: 7 });
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, slides: 8 });
   });
 
   it('fails validation of an unknown layout with exit 1', async () => {

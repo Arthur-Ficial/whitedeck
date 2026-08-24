@@ -1,9 +1,14 @@
 import matter from 'gray-matter';
-import { LAYOUT_IDS } from '../theme/white.js';
+import { ALL_LAYOUT_IDS } from '../theme/white.js';
 
 export interface DeckBullet {
   readonly text: string;
   readonly level: number;
+}
+
+export interface DeckColumn {
+  readonly header: string;
+  readonly bullets: readonly DeckBullet[];
 }
 
 export interface DeckSlide {
@@ -14,6 +19,8 @@ export interface DeckSlide {
   readonly images: readonly string[];
   readonly quote?: string;
   readonly attribution?: string;
+  readonly source?: string;
+  readonly columns?: readonly DeckColumn[];
 }
 
 export interface DeckMeta {
@@ -43,6 +50,7 @@ interface MutableSlide {
   images: string[];
   quoteLines: string[];
   attribution?: string;
+  source?: string;
 }
 
 const parseLine = (line: string, slide: MutableSlide): void => {
@@ -71,6 +79,10 @@ const parseLine = (line: string, slide: MutableSlide): void => {
     else if (text.length > 0) slide.quoteLines.push(text);
     return;
   }
+  if (line.trimStart().startsWith('Source:')) {
+    slide.source = line.trim();
+    return;
+  }
   const bullet = BULLET.exec(line);
   if (bullet?.[1] !== undefined && bullet[2] !== undefined) {
     slide.bullets.push({ text: plainText(bullet[2]), level: Math.floor(bullet[1].length / 2) });
@@ -96,10 +108,25 @@ const inferLayout = (slide: MutableSlide, isFirst: boolean): string => {
   return 'title-bullets';
 };
 
+const COLUMN_HEADER = /^\*\*(.+)\*\*$/;
+
+const toColumns = (bullets: readonly DeckBullet[]): DeckColumn[] => {
+  const columns: { header: string; bullets: DeckBullet[] }[] = [];
+  for (const bullet of bullets) {
+    const header = COLUMN_HEADER.exec(bullet.text);
+    if (header?.[1] !== undefined) {
+      columns.push({ header: header[1], bullets: [] });
+    } else {
+      columns.at(-1)?.bullets.push(bullet);
+    }
+  }
+  return columns;
+};
+
 const finalizeSlide = (slide: MutableSlide, isFirst: boolean): DeckSlide => {
   const layout = slide.layout ?? inferLayout(slide, isFirst);
-  if (!LAYOUT_IDS.includes(layout)) {
-    throw new Error(`Unknown layout "${layout}". Valid layouts: ${LAYOUT_IDS.join(', ')}`);
+  if (!ALL_LAYOUT_IDS.includes(layout)) {
+    throw new Error(`Unknown layout "${layout}". Valid layouts: ${ALL_LAYOUT_IDS.join(', ')}`);
   }
   const quote = slide.quoteLines.join(' ');
   return {
@@ -110,6 +137,8 @@ const finalizeSlide = (slide: MutableSlide, isFirst: boolean): DeckSlide => {
     images: slide.images,
     ...(quote.length > 0 && { quote }),
     ...(slide.attribution !== undefined && { attribution: slide.attribution }),
+    ...(slide.source !== undefined && { source: slide.source }),
+    ...(layout === 'compare' && { columns: toColumns(slide.bullets) }),
   };
 };
 

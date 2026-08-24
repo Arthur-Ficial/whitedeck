@@ -48,7 +48,7 @@ const bulletBodyRule = (id: string, ph: ThemePlaceholder): string => {
   const indentPx = ph.indentPt !== undefined ? Math.round((ph.indentPt * 4) / 3) : INDENT_STEP_PX;
   return [
     rule(`section.${id} p:not(:has(> img)), section.${id} ul`, `${box(ph)}\n${text(ph)}\n${flexV(ph)}`),
-    rule(`section.${id} ul`, '  list-style: none;'),
+    rule(`section.${id} ul`, '  list-style: none;\n  padding: 0;'),
     rule(`section.${id} li`, `  padding-left: ${indentPx}px;\n  text-indent: -${indentPx}px;`),
     ...(ph.spaceBeforePt !== undefined
       ? [rule(`section.${id} li + li`, `  margin-top: ${ph.spaceBeforePt}pt;`)]
@@ -120,7 +120,47 @@ export const themeCss = (): string => {
     rule('section h1, section h2, section p, section ul, section blockquote', '  margin: 0;'),
     rule('section p:has(> img)', '  display: contents;'),
     rule('section img', '  position: absolute;'),
+    rule('section a', '  color: #0000EE;\n  text-decoration: underline;'),
+    rule(
+      'section footer',
+      [
+        '  position: absolute;',
+        '  left: 177px;',
+        '  bottom: 28px;',
+        '  right: 177px;',
+        '  font-size: 24pt;',
+        `  font-family: ${FONT_STACK};`,
+        '  font-weight: 300;',
+        '  color: #666666;',
+        '  text-align: left;',
+      ].join('\n'),
+    ),
   ];
   const layouts = LAYOUT_IDS.map((id) => layoutRules(id, layoutOf(id)));
-  return [...base, ...layouts].join('\n');
+  return [...base, ...layouts, compareRules()].join('\n');
+};
+
+/** Virtual side-by-side comparison layout on title-bullets geometry. */
+const compareRules = (): string => {
+  const layout = layoutOf('compare');
+  const title = layout.placeholders.find((p) => p.role === 'title');
+  const body = layout.placeholders.find((p) => p.role === 'body');
+  if (!title || !body) throw new Error('compare needs title-bullets placeholders');
+  const indentPx = body.indentPt !== undefined ? Math.round((body.indentPt * 4) / 3) : INDENT_STEP_PX;
+  return [
+    titleRule('compare', title),
+    rule('section.compare .cols', `${box(body)}\n  display: flex;\n  gap: ${indentPx * 2}px;`),
+    rule('section.compare .col ', '  flex: 1;'),
+    rule(
+      'section.compare .col h3',
+      `  font-size: ${body.sizePt}pt;\n  font-family: ${FONT_STACK};\n  font-weight: 500;\n  margin: 0;`,
+    ),
+    rule('section.compare .col ul', `  list-style: none;\n  padding: 0;\n  margin: 0;\n  font-size: ${body.sizePt}pt;`),
+    rule('section.compare .col li', `  padding-left: ${indentPx}px;\n  text-indent: -${indentPx}px;`),
+    rule('section.compare .col li, section.compare .col h3 + ul li:first-child', `  margin-top: ${body.spaceBeforePt ?? 0}pt;`),
+    rule(
+      'section.compare .col li::before',
+      `  content: "${body.bullet ?? '•'}";\n  margin-right: 0.45em;\n  font-size: ${body.bulletSizePct ?? 100}%;\n  line-height: 0;`,
+    ),
+  ].join('\n');
 };

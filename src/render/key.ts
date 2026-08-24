@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { Deck, DeckSlide } from '../parse/deck.js';
+import { inlineToPlain } from '../parse/inline.js';
 import { layoutOf, placeholdersByRole } from '../theme/white.js';
 
 const execFileAsync = promisify(execFile);
@@ -24,6 +25,7 @@ const MASTER_CANDIDATES: Readonly<Record<string, readonly string[]>> = {
   'photo-3-up': ['Photo - 3 Up'],
   'quote': ['Quote'],
   'blank': ['Blank'],
+  'compare': ['Title & Bullets'],
 };
 
 const str = (value: string): string =>
@@ -32,6 +34,11 @@ const str = (value: string): string =>
 const list = (values: readonly string[]): string => `{${values.map((v) => str(v)).join(', ')}}`;
 
 const bodyText = (slide: DeckSlide): string | undefined => {
+  if (slide.columns !== undefined && slide.columns.length > 0) {
+    return slide.columns
+      .map((col) => [col.header, ...col.bullets.map((b) => `\t${b.text}`)].join('\n'))
+      .join('\n');
+  }
   if (slide.quote !== undefined) {
     return slide.attribution !== undefined ? `${slide.quote}\n—${slide.attribution}` : slide.quote;
   }
@@ -96,6 +103,15 @@ const slideStatements = (slide: DeckSlide, images: readonly PlacedImage[]): stri
     ...(slide.title !== undefined ? [`set object text of default title item of s to ${str(slide.title)}`] : []),
     ...(body !== undefined ? [`set object text of default body item of s to ${str(body)}`] : []),
     ...imageStatements(images),
+    ...(slide.source !== undefined
+      ? [
+          'tell s',
+          `  set srcItem to make new text item with properties {object text:${str(inlineToPlain(slide.source))}}`,
+          'end tell',
+          'set position of srcItem to {133, 1020}',
+          'set size of object text of srcItem to 24',
+        ]
+      : []),
   ];
 };
 
