@@ -35,7 +35,7 @@ tell the whole story.
 ## Commands
 
 ```bash
-npm install -g github:franzenzenhofer/whitedeck   # once
+npm install -g https://github.com/franzenzenhofer/whitedeck/archive/refs/heads/main.tar.gz   # once
 whitedeck build deck.md -f pptx           # editable PowerPoint
 whitedeck build deck.md -f all -o out/    # html + pdf + pptx (+ native .key on macOS)
 whitedeck layouts                         # list layouts

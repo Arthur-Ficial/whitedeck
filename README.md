@@ -4,7 +4,7 @@
 and native Keynote `.key` out, all pixel-identical to Apple Keynote's standard White theme.
 
 ```bash
-npm install -g github:franzenzenhofer/whitedeck
+npm install -g https://github.com/franzenzenhofer/whitedeck/archive/refs/heads/main.tar.gz
 whitedeck init my-deck.md
 whitedeck build my-deck.md -f all
 ```
