@@ -60,7 +60,22 @@ author: Me
 # The ocean
 ## A caption
 ![](ocean.png)
+
+Source: [GSC Performance](https://search.google.com/search-console)
+
+---
+
+<!-- _class: compare -->
+# New template loads 3x faster than old
+- **Before**
+- LCP 4.1s
+- **After**
+- LCP 1.3s
 ```
+
+Links `[text](url)` render blue and underlined in every format (real hyperlinks in PPTX).
+A final `Source: [Name](url)` line becomes a small source note at the bottom of the slide.
+Titles that would overflow their box auto-shrink, exactly like Keynote.
 
 List all layouts: `whitedeck layouts`
 
@@ -68,6 +83,7 @@ List all layouts: `whitedeck layouts`
 title            title-center     title-top        title-bullets
 bullets          title-bullets-photo               photo
 photo-horizontal photo-vertical   photo-3-up       quote            blank
+compare          (virtual: side-by-side bullet columns on Keynote geometry)
 ```
 
 ## CLI
@@ -82,7 +98,9 @@ whitedeck init [name]                              # scaffold an example deck
 
 ## For AI agents
 
-- **Claude skill**: `skills/whitedeck/SKILL.md` ships in the npm package.
+- **Claude skill**: `skills/whitedeck/SKILL.md` ships in the npm package - including the
+  editorial persona (assertion headlines, max 5 bullets, one chart per slide, everything
+  linked to its data source).
 - **MCP server**: `whitedeck-mcp` (stdio) exposes `whitedeck_build`, `whitedeck_layouts`,
   `whitedeck_validate`:
 
