@@ -4,8 +4,9 @@
 and native Keynote `.key` out, all pixel-identical to Apple Keynote's standard White theme.
 
 ```bash
-npx whitedeck init my-deck.md
-npx whitedeck build my-deck.md -f all
+npm install -g github:franzenzenhofer/whitedeck
+whitedeck init my-deck.md
+whitedeck build my-deck.md -f all
 ```
 
 ## Why
@@ -98,14 +99,14 @@ whitedeck init [name]                              # scaffold an example deck
 
 ## For AI agents
 
-- **Claude skill**: `skills/whitedeck/SKILL.md` ships in the npm package - including the
+- **Claude skill**: `skills/whitedeck/SKILL.md` ships with the package - including the
   editorial persona (assertion headlines, max 5 bullets, one chart per slide, everything
   linked to its data source).
 - **MCP server**: `whitedeck-mcp` (stdio) exposes `whitedeck_build`, `whitedeck_layouts`,
   `whitedeck_validate`:
 
 ```bash
-claude mcp add whitedeck -- npx -y whitedeck-mcp
+claude mcp add whitedeck -- whitedeck-mcp
 ```
 
 ## Development

@@ -35,13 +35,14 @@ tell the whole story.
 ## Commands
 
 ```bash
-npx whitedeck build deck.md -f pptx           # editable PowerPoint
-npx whitedeck build deck.md -f all -o out/    # html + pdf + pptx (+ native .key on macOS)
-npx whitedeck layouts                         # list layouts
-npx whitedeck validate deck.md                # JSON report, exit 1 on errors
+npm install -g github:franzenzenhofer/whitedeck   # once
+whitedeck build deck.md -f pptx           # editable PowerPoint
+whitedeck build deck.md -f all -o out/    # html + pdf + pptx (+ native .key on macOS)
+whitedeck layouts                         # list layouts
+whitedeck validate deck.md                # JSON report, exit 1 on errors
 ```
 
-MCP alternative: `claude mcp add whitedeck -- npx -y whitedeck-mcp`
+MCP alternative: `claude mcp add whitedeck -- whitedeck-mcp`
 (tools: `whitedeck_build`, `whitedeck_layouts`, `whitedeck_validate`).
 
 ## Deck markdown

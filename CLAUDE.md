@@ -2,7 +2,7 @@
 
 ## Golden Goal
 
-> **Any AI agent or human can run `npx whitedeck build deck.md` on plain markdown and get a
+> **Any AI agent or human can run `whitedeck build deck.md` (installed via `npm i -g github:franzenzenhofer/whitedeck`) on plain markdown and get a
 > presentation indistinguishable from a native Apple Keynote White-theme deck - as HTML, PDF,
 > editable PPTX, and native .key - with every layout's geometry provably identical to Apple's own
 > values (single source of truth: `src/theme/white.json`), driven by a unix CLI, a Claude skill,
