@@ -40,8 +40,7 @@
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json && chmod +x dist/cli.js dist/mcp/server.js",
     "gates": "npm run typecheck && npm run lint && npm run test && npm run build",
-    "prepublishOnly": "npm run typecheck && npm run lint && npm run build",
-    "prepare": "tsc -p tsconfig.build.json && chmod +x dist/cli.js dist/mcp/server.js"
+    "prepublishOnly": "npm run typecheck && npm run lint && npm run build"
   },
   "dependencies": {
     "@marp-team/marp-cli": "^4.2.3",
