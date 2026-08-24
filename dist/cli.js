@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { OUTPUT_FORMATS, renderFormat, resolveFormats } from './formats.js';
@@ -73,8 +73,12 @@ const validate = (args) => {
 };
 const init = (args) => {
     const target = resolve(args[0] ?? 'deck.md');
-    const example = new URL('../examples/demo.md', import.meta.url).pathname;
-    writeFileSync(target, readFileSync(example, 'utf8'), { flag: 'wx' });
+    const examplesDir = new URL('../examples/', import.meta.url).pathname;
+    writeFileSync(target, readFileSync(join(examplesDir, 'demo.md'), 'utf8'), { flag: 'wx' });
+    for (const asset of readdirSync(examplesDir)) {
+        if (asset.endsWith('.png'))
+            copyFileSync(join(examplesDir, asset), join(dirname(target), asset));
+    }
     process.stdout.write(`${target}\n`);
 };
 const main = async () => {

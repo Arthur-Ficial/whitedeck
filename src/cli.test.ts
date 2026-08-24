@@ -44,6 +44,16 @@ describe('whitedeck CLI (built artifact, end to end)', () => {
     expect(existsSync(join(outDir, 'deck.pptx'))).toBe(true);
   });
 
+  it('init scaffolds a deck that builds standalone, images included', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'whitedeck-init-'));
+    const initRes = await runCli(['init', join(outDir, 'my.md')]);
+    expect(initRes.code).toBe(0);
+    const buildRes = await runCli(['build', join(outDir, 'my.md'), '-f', 'pptx']);
+    expect(buildRes.stderr).toBe('');
+    expect(buildRes.code).toBe(0);
+    expect(existsSync(join(outDir, 'my.pptx'))).toBe(true);
+  });
+
   it('lists all 12 layouts as json', async () => {
     const { code, stdout } = await runCli(['layouts', '--json']);
     expect(code).toBe(0);
