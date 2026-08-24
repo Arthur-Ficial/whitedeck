@@ -1,23 +1,60 @@
-import Pptxgen from 'pptxgenjs';
+import PptxGenJSImport from 'pptxgenjs';
 import type { Deck, DeckSlide } from '../parse/deck.js';
-import whiteTheme from '../theme/white.json' with { type: 'json' };
+import type { ThemeLayout, ThemePlaceholder } from '../theme/types.js';
+import { layoutOf, placeholdersByRole, WHITE } from '../theme/white.js';
+
+/* pptxgenjs ships UMD-style typings that NodeNext ESM cannot resolve, so the
+   exact API surface whitedeck uses is typed here and the constructor cast once. */
+interface TextBoxOptions {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  fontSize: number;
+  fontFace: string;
+  color: string;
+  align: 'left' | 'center' | 'right';
+  margin: number;
+  valign?: 'top' | 'middle' | 'bottom';
+}
+
+interface TextItem {
+  text: string;
+  options: { bullet: { code: string } | boolean; indentLevel: number; breakLine: boolean };
+}
+
+interface ImageOptions {
+  path: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  sizing: { type: 'cover'; w: number; h: number };
+}
+
+interface PptxSlide {
+  addText(text: string | TextItem[], options: TextBoxOptions): void;
+  addImage(options: ImageOptions): void;
+  background: { color: string };
+}
+
+interface PptxDocument {
+  defineLayout(layout: { name: string; width: number; height: number }): void;
+  layout: string;
+  title: string;
+  author: string;
+  addSlide(): PptxSlide;
+  writeFile(options: { fileName: string }): Promise<string>;
+}
+
+const PptxGenJS = PptxGenJSImport as unknown as new () => PptxDocument;
 
 const EMU_PER_INCH = 914400;
 const inch = (emu: number): number => emu / EMU_PER_INCH;
 
 const BULLET_CODE = '2022';
 
-type JsonLayout = (typeof whiteTheme.layouts)['title-bullets'];
-type JsonPlaceholder = JsonLayout['placeholders'][number];
-type Slide = ReturnType<Pptxgen['addSlide']>;
-
-const themeLayout = (id: string): JsonLayout => {
-  const layout = whiteTheme.layouts[id as keyof typeof whiteTheme.layouts];
-  if (!layout) throw new Error(`Unknown layout "${id}" in white.json`);
-  return layout;
-};
-
-const textOptions = (ph: JsonPlaceholder): Pptxgen.TextPropsOptions => ({
+const textOptions = (ph: ThemePlaceholder): TextBoxOptions => ({
   x: inch(ph.xEmu),
   y: inch(ph.yEmu),
   w: inch(ph.wEmu),
@@ -29,8 +66,8 @@ const textOptions = (ph: JsonPlaceholder): Pptxgen.TextPropsOptions => ({
   margin: 0,
 });
 
-const addBullets = (target: Slide, ph: JsonPlaceholder, slide: DeckSlide): void => {
-  const items = slide.bullets.map((bullet) => ({
+const addBullets = (target: PptxSlide, ph: ThemePlaceholder, slide: DeckSlide): void => {
+  const items: TextItem[] = slide.bullets.map((bullet) => ({
     text: bullet.text,
     options: {
       bullet: ph.bullet !== undefined ? { code: BULLET_CODE } : false,
@@ -41,10 +78,8 @@ const addBullets = (target: Slide, ph: JsonPlaceholder, slide: DeckSlide): void 
   target.addText(items, { ...textOptions(ph), valign: 'top' });
 };
 
-const addQuote = (target: Slide, layout: JsonLayout, slide: DeckSlide): void => {
-  const bodies = layout.placeholders
-    .filter((p) => p.role === 'body')
-    .sort((a, b) => b.sizePt - a.sizePt);
+const addQuote = (target: PptxSlide, layout: ThemeLayout, slide: DeckSlide): void => {
+  const bodies = [...placeholdersByRole(layout, 'body')].sort((a, b) => b.sizePt - a.sizePt);
   const quotePh = bodies[0];
   const attributionPh = bodies[1];
   if (slide.quote !== undefined && quotePh) {
@@ -55,8 +90,8 @@ const addQuote = (target: Slide, layout: JsonLayout, slide: DeckSlide): void => 
   }
 };
 
-const addImages = (target: Slide, layout: JsonLayout, slide: DeckSlide): void => {
-  const pics = layout.placeholders.filter((p) => p.role === 'pic');
+const addImages = (target: PptxSlide, layout: ThemeLayout, slide: DeckSlide): void => {
+  const pics = placeholdersByRole(layout, 'pic');
   slide.images.forEach((image, index) => {
     const ph = pics[index] ?? pics[0];
     if (!ph) return;
@@ -71,8 +106,8 @@ const addImages = (target: Slide, layout: JsonLayout, slide: DeckSlide): void =>
   });
 };
 
-const addSlideContent = (target: Slide, slide: DeckSlide): void => {
-  const layout = themeLayout(slide.layout);
+const addSlideContent = (target: PptxSlide, slide: DeckSlide): void => {
+  const layout = layoutOf(slide.layout);
 
   const titlePh = layout.placeholders.find((p) => p.role === 'title');
   if (titlePh && slide.title !== undefined) {
@@ -91,15 +126,15 @@ const addSlideContent = (target: Slide, slide: DeckSlide): void => {
     }
   }
 
-  addImages(target, themeLayout(slide.layout), slide);
+  addImages(target, layout, slide);
 };
 
 export const renderPptx = async (deck: Deck, outPath: string): Promise<void> => {
-  const pptx = new Pptxgen();
+  const pptx = new PptxGenJS();
   pptx.defineLayout({
     name: 'KEYNOTE_16x9',
-    width: inch(whiteTheme.canvas.widthEmu),
-    height: inch(whiteTheme.canvas.heightEmu),
+    width: inch(WHITE.canvas.widthEmu),
+    height: inch(WHITE.canvas.heightEmu),
   });
   pptx.layout = 'KEYNOTE_16x9';
   if (deck.meta.title !== undefined) pptx.title = deck.meta.title;
@@ -107,7 +142,7 @@ export const renderPptx = async (deck: Deck, outPath: string): Promise<void> => 
 
   for (const slide of deck.slides) {
     const target = pptx.addSlide();
-    target.background = { color: whiteTheme.background.replace('#', '') };
+    target.background = { color: WHITE.background.replace('#', '') };
     addSlideContent(target, slide);
   }
   await pptx.writeFile({ fileName: outPath });

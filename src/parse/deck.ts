@@ -1,5 +1,5 @@
 import matter from 'gray-matter';
-import whiteTheme from '../theme/white.json' with { type: 'json' };
+import { LAYOUT_IDS } from '../theme/white.js';
 
 export interface DeckBullet {
   readonly text: string;
@@ -25,8 +25,6 @@ export interface Deck {
   readonly meta: DeckMeta;
   readonly slides: readonly DeckSlide[];
 }
-
-export const LAYOUT_IDS: readonly string[] = Object.keys(whiteTheme.layouts);
 
 const CLASS_DIRECTIVE = /<!--\s*_class:\s*([\w-]+)\s*-->/;
 const IMAGE = /!\[[^\]]*\]\(([^)]+)\)/g;

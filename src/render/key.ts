@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { Deck, DeckSlide } from '../parse/deck.js';
-import whiteTheme from '../theme/white.json' with { type: 'json' };
+import { layoutOf, placeholdersByRole } from '../theme/white.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -38,8 +38,7 @@ const bodyText = (slide: DeckSlide): string | undefined => {
 };
 
 const imageStatements = (slide: DeckSlide): string[] => {
-  const layout = whiteTheme.layouts[slide.layout as keyof typeof whiteTheme.layouts];
-  const pics = layout.placeholders.filter((p) => p.role === 'pic');
+  const pics = placeholdersByRole(layoutOf(slide.layout), 'pic');
   return slide.images.flatMap((image, index) => {
     const ph = pics[index] ?? pics[0];
     if (!ph) return [];

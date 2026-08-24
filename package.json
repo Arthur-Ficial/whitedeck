@@ -45,7 +45,8 @@
     "@marp-team/marp-cli": "^4.2.3",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "gray-matter": "^4.0.3",
-    "pptxgenjs": "^4.0.1"
+    "pptxgenjs": "^4.0.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
