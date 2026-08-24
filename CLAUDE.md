@@ -32,6 +32,14 @@ npm run typecheck && npm run lint && npm run test && npm run build
 - `src/mcp/server.ts` - MCP server exposing `whitedeck_build|layouts|validate`.
 - `skills/whitedeck/SKILL.md` - the Claude skill.
 
+## Development principles (BINDING)
+
+**DEVELOPMENT-PRINCIPLES.md is mandatory for every change** - P1 (test the final artifact,
+never intermediates), P2 (output that feeds a parser is tested THROUGH that parser),
+P3 (conservation invariants: images/text/links in == out), P4 (kitchen-sink fixture combines
+all features), P5 (fixtures on both sides of every threshold), P7 (rebuild the flagship deck
+after emitter changes), P10 (run the affected user journey on the built binary and look at it).
+
 ## Rules
 
 - TDD red-to-green for every change: failing test first, watch it fail, minimal code, watch it pass.
