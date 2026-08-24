@@ -7,6 +7,7 @@ import { layoutOf, placeholdersByRole, WHITE } from '../theme/white.js';
 /* pptxgenjs ships UMD-style typings that NodeNext ESM cannot resolve, so the
    exact API surface whitedeck uses is typed here and the constructor cast once. */
 interface TextBoxOptions {
+  fit?: 'shrink';
   x: number;
   y: number;
   w: number;
@@ -84,6 +85,7 @@ const inch = (emu: number): number => emu / EMU_PER_INCH;
 const BULLET_CODE = '2022';
 
 const textOptions = (ph: ThemePlaceholder): TextBoxOptions => ({
+  fit: 'shrink',
   valign: ph.vAlign,
   x: inch(ph.xEmu),
   y: inch(ph.yEmu),

@@ -70,6 +70,7 @@ describe('renderPptx (native editable OOXML)', () => {
     const slide1 = await zip.file('ppt/slides/slide1.xml')?.async('string');
     expect(slide1).toMatch(/anchor="b"/);
     expect(slide1).toContain('Hello Keynote');
+    expect(slide2).toContain('<a:normAutofit/>');
     expect(slide1).toContain('A subtitle');
   });
 
