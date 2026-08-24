@@ -44,6 +44,7 @@ describe.skipIf(!existsSync(REFERENCE_PPTX))('extractTheme (requires local Keyno
       font: 'Helvetica Neue Medium',
       color: '#000000',
       align: 'center',
+      vAlign: 'middle',
     });
     const tbBody = titleBullets?.placeholders.find((p) => p.role === 'body');
     expect(tbBody).toMatchObject({
@@ -56,7 +57,15 @@ describe.skipIf(!existsSync(REFERENCE_PPTX))('extractTheme (requires local Keyno
       color: '#000000',
       align: 'left',
       bullet: '•',
+      spaceBeforePt: 59,
+      bulletSizePct: 125,
+      indentPt: 50,
+      vAlign: 'middle',
     });
+
+    const titleLayout = theme.layouts['title'];
+    expect(titleLayout?.placeholders.find((p) => p.role === 'title')?.vAlign).toBe('bottom');
+    expect(titleLayout?.placeholders.find((p) => p.role === 'body')?.vAlign).toBe('top');
 
     const photoH = theme.layouts['photo-horizontal'];
     expect(photoH?.keynoteName).toBe('Photo - Horizontal');
@@ -75,6 +84,9 @@ describe.skipIf(!existsSync(REFERENCE_PPTX))('extractTheme (requires local Keyno
     const photoHBody = photoH?.placeholders.find((p) => p.role === 'body');
     expect(photoHBody?.sizePt).toBe(54);
     expect(photoHBody?.align).toBe('center');
+
+    const tbpBody = theme.layouts['title-bullets-photo']?.placeholders.find((p) => p.role === 'body');
+    expect(tbpBody?.spaceBeforePt).toBe(45);
 
     const quoteBodies = theme.layouts['quote']?.placeholders.filter((p) => p.role === 'body');
     expect(quoteBodies?.map((p) => p.sizePt).sort((a, b) => a - b)).toEqual([32, 48]);

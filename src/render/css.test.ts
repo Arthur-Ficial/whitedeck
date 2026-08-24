@@ -40,6 +40,23 @@ describe('themeCss', () => {
     expect(ul).toContain('text-align: left');
   });
 
+  it('anchors text vertically like Keynote (centered bullets, bottom-anchored photo titles)', () => {
+    const ul = /section\.title-bullets p:not\(:has\(> img\)\), section\.title-bullets ul\s*{[^}]*}/.exec(css)?.[0] ?? '';
+    expect(ul).toContain('justify-content: center');
+    const photoTitle = /section\.photo-horizontal h1\s*{[^}]*}/.exec(css)?.[0] ?? '';
+    expect(photoTitle).toContain('justify-content: flex-end');
+  });
+
+  it('applies Keynote paragraph spacing and bullet scale to bullet layouts', () => {
+    expect(css).toMatch(/section\.title-bullets li \+ li\s*{[^}]*margin-top:\s*59pt/);
+    expect(css).toMatch(/section\.title-bullets li::before\s*{[^}]*font-size:\s*125%/);
+    expect(css).toMatch(/section\.title-bullets-photo li \+ li\s*{[^}]*margin-top:\s*45pt/);
+  });
+
+  it('lifts image paragraphs out of text flow so images position against the slide', () => {
+    expect(css).toMatch(/section p:has\(> img\)\s*{[^}]*display:\s*contents/);
+  });
+
   it('styles quote and attribution with their two distinct body sizes', () => {
     expect(css).toMatch(/section\.quote blockquote\s*{[^}]*font-size:\s*48pt/);
     expect(css).toMatch(/section\.quote > p\s*{[^}]*font-size:\s*32pt/);

@@ -81,6 +81,11 @@ describe('parseDeck', () => {
     expect(deck.slides[2]?.layout).toBe('blank');
   });
 
+  it('strips inline code markers so text matches Keynote rendering', () => {
+    const deck = parseDeck('# T\n- run `npx whitedeck` now');
+    expect(deck.slides[0]?.bullets[0]?.text).toBe('run npx whitedeck now');
+  });
+
   it('fails fast on unknown layout names', () => {
     expect(() => parseDeck('<!-- _class: does-not-exist -->\n# X')).toThrow(/does-not-exist/);
   });

@@ -1,5 +1,7 @@
 import { execFile } from 'node:child_process';
-import { resolve } from 'node:path';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { extname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { Deck, DeckSlide } from '../parse/deck.js';
 import { layoutOf, placeholdersByRole } from '../theme/white.js';
@@ -25,7 +27,7 @@ const MASTER_CANDIDATES: Readonly<Record<string, readonly string[]>> = {
 };
 
 const str = (value: string): string =>
-  `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\t/g, '\\t')}"`;
 
 const list = (values: readonly string[]): string => `{${values.map((v) => str(v)).join(', ')}}`;
 
@@ -33,36 +35,71 @@ const bodyText = (slide: DeckSlide): string | undefined => {
   if (slide.quote !== undefined) {
     return slide.attribution !== undefined ? `${slide.quote}\n—${slide.attribution}` : slide.quote;
   }
-  if (slide.bullets.length > 0) return slide.bullets.map((b) => b.text).join('\n');
+  if (slide.bullets.length > 0) return slide.bullets.map((b) => '\t'.repeat(b.level) + b.text).join('\n');
   return slide.subtitle;
 };
 
-const imageStatements = (slide: DeckSlide): string[] => {
-  const pics = placeholdersByRole(layoutOf(slide.layout), 'pic');
-  return slide.images.flatMap((image, index) => {
-    const ph = pics[index] ?? pics[0];
-    if (!ph) return [];
-    const pt = (emu: number): number => Math.round(emu / EMU_PER_PT);
-    return [
-      `set img to make new image at s with properties {file:POSIX file ${str(resolve(image))}}`,
-      `set position of img to {${pt(ph.xEmu)}, ${pt(ph.yEmu)}}`,
-      `set width of img to ${pt(ph.wEmu)}`,
-    ];
-  });
+interface PlacedImage {
+  readonly path: string;
+  readonly xPt: number;
+  readonly yPt: number;
+  readonly wPt: number;
+}
+
+const imageDimensions = async (path: string): Promise<{ w: number; h: number }> => {
+  const { stdout } = await execFileAsync('sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', path]);
+  const w = /pixelWidth: (\d+)/.exec(stdout)?.[1];
+  const h = /pixelHeight: (\d+)/.exec(stdout)?.[1];
+  if (!w || !h) throw new Error(`Cannot read image dimensions of ${path}`);
+  return { w: Number(w), h: Number(h) };
 };
 
-const slideStatements = (slide: DeckSlide): string[] => {
+/** Center-crop a copy of the image to the placeholder aspect so it fills the box like a
+    Keynote media placeholder (AppleScript cannot crop, so we crop the file itself). */
+const cropToAspect = async (src: string, aspect: number, workDir: string, index: number): Promise<string> => {
+  const { w, h } = await imageDimensions(src);
+  const cropW = w / h > aspect ? Math.round(h * aspect) : w;
+  const cropH = w / h > aspect ? h : Math.round(w / aspect);
+  const out = join(workDir, `img-${index}${extname(src)}`);
+  await execFileAsync('sips', ['-c', String(cropH), String(cropW), src, '--out', out]);
+  return out;
+};
+
+const placeImages = async (slide: DeckSlide, workDir: string, offset: number): Promise<PlacedImage[]> => {
+  const pics = placeholdersByRole(layoutOf(slide.layout), 'pic');
+  const placed: PlacedImage[] = [];
+  for (const [index, image] of slide.images.entries()) {
+    const ph = pics[index] ?? pics[0];
+    if (!ph) continue;
+    const pt = (emu: number): number => Math.round(emu / EMU_PER_PT);
+    const path = await cropToAspect(resolve(image), ph.wEmu / ph.hEmu, workDir, offset + index);
+    placed.push({ path, xPt: pt(ph.xEmu), yPt: pt(ph.yEmu), wPt: pt(ph.wEmu) });
+  }
+  return placed;
+};
+
+const imageStatements = (images: readonly PlacedImage[]): string[] =>
+  images.flatMap((image) => [
+    `set imgFile to POSIX file ${str(image.path)} as alias`,
+    'tell s',
+    '  set img to make new image with properties {file:imgFile}',
+    'end tell',
+    `set position of img to {${image.xPt}, ${image.yPt}}`,
+    `set width of img to ${image.wPt}`,
+  ]);
+
+const slideStatements = (slide: DeckSlide, images: readonly PlacedImage[]): string[] => {
   const body = bodyText(slide);
   return [
     `set m to my pickMaster(d, ${list(MASTER_CANDIDATES[slide.layout] ?? ['Blank'])})`,
     'set s to make new slide at d with properties {base slide:m}',
     ...(slide.title !== undefined ? [`set object text of default title item of s to ${str(slide.title)}`] : []),
     ...(body !== undefined ? [`set object text of default body item of s to ${str(body)}`] : []),
-    ...imageStatements(slide),
+    ...imageStatements(images),
   ];
 };
 
-const buildScript = (deck: Deck, outPath: string): string =>
+const buildScript = (deck: Deck, imagesPerSlide: readonly PlacedImage[][], outPath: string): string =>
   [
     'on pickMaster(d, candidateNames)',
     '  tell application "Keynote"',
@@ -76,7 +113,9 @@ const buildScript = (deck: Deck, outPath: string): string =>
     '',
     'tell application "Keynote"',
     '  set d to make new document with properties {document theme:theme "White", width:1920, height:1080}',
-    ...deck.slides.flatMap((slide) => slideStatements(slide).map((line) => `  ${line}`)),
+    ...deck.slides.flatMap((slide, i) =>
+      slideStatements(slide, imagesPerSlide[i] ?? []).map((line) => `  ${line}`),
+    ),
     '  delete slide 1 of d',
     `  save d in POSIX file ${str(resolve(outPath))}`,
     '  close d saving no',
@@ -107,9 +146,18 @@ export const renderKey = async (deck: Deck, outPath: string): Promise<void> => {
     throw new Error('Native .key output requires macOS with Keynote.app installed');
   }
   const wasRunning = await keynoteIsRunning();
+  const workDir = await mkdtemp(join(tmpdir(), 'whitedeck-key-img-'));
   try {
-    await runAppleScript(buildScript(deck, outPath));
+    const imagesPerSlide: PlacedImage[][] = [];
+    let offset = 0;
+    for (const slide of deck.slides) {
+      const placed = await placeImages(slide, workDir, offset);
+      imagesPerSlide.push(placed);
+      offset += placed.length;
+    }
+    await runAppleScript(buildScript(deck, imagesPerSlide, outPath));
   } finally {
+    await rm(workDir, { recursive: true, force: true });
     if (!wasRunning) await quitKeynoteIfIdle();
   }
 };

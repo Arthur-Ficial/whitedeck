@@ -29,7 +29,8 @@
           "sizePt": 112,
           "font": "Helvetica Neue Medium",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "bottom"
         },
         {
           "role": "body",
@@ -44,7 +45,8 @@
           "sizePt": 54,
           "font": "Helvetica Neue",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         },
         {
           "role": "sldNum",
@@ -59,7 +61,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         }
       ]
     },
@@ -81,7 +84,11 @@
           "font": "Helvetica Neue",
           "color": "#000000",
           "align": "left",
-          "bullet": "•"
+          "vAlign": "middle",
+          "bullet": "•",
+          "spaceBeforePt": 59,
+          "bulletSizePct": 125,
+          "indentPt": 50
         },
         {
           "role": "sldNum",
@@ -96,7 +103,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         }
       ]
     },
@@ -116,7 +124,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         },
         {
           "role": "pic",
@@ -131,7 +140,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         },
         {
           "role": "pic",
@@ -147,7 +157,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         },
         {
           "role": "sldNum",
@@ -162,7 +173,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         }
       ]
     },
@@ -182,7 +194,8 @@
           "sizePt": 32,
           "font": "Helvetica Neue",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         },
         {
           "role": "body",
@@ -197,7 +210,8 @@
           "sizePt": 48,
           "font": "Helvetica Neue Medium",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         },
         {
           "role": "sldNum",
@@ -212,7 +226,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         }
       ]
     },
@@ -233,7 +248,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         },
         {
           "role": "sldNum",
@@ -248,7 +264,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         }
       ]
     },
@@ -268,7 +285,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         }
       ]
     },
@@ -289,7 +307,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         },
         {
           "role": "title",
@@ -304,7 +323,8 @@
           "sizePt": 112,
           "font": "Helvetica Neue Medium",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "bottom"
         },
         {
           "role": "body",
@@ -319,7 +339,8 @@
           "sizePt": 54,
           "font": "Helvetica Neue",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         },
         {
           "role": "sldNum",
@@ -334,7 +355,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         }
       ]
     },
@@ -354,7 +376,8 @@
           "sizePt": 112,
           "font": "Helvetica Neue Medium",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "middle"
         },
         {
           "role": "sldNum",
@@ -369,7 +392,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         }
       ]
     },
@@ -389,7 +413,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         },
         {
           "role": "title",
@@ -404,7 +429,8 @@
           "sizePt": 84,
           "font": "Helvetica Neue Medium",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "bottom"
         },
         {
           "role": "body",
@@ -419,7 +445,8 @@
           "sizePt": 54,
           "font": "Helvetica Neue",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         },
         {
           "role": "sldNum",
@@ -434,7 +461,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         }
       ]
     },
@@ -454,7 +482,8 @@
           "sizePt": 112,
           "font": "Helvetica Neue Medium",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "middle"
         },
         {
           "role": "sldNum",
@@ -469,7 +498,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         }
       ]
     },
@@ -489,7 +519,8 @@
           "sizePt": 112,
           "font": "Helvetica Neue Medium",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "middle"
         },
         {
           "role": "body",
@@ -506,7 +537,11 @@
           "font": "Helvetica Neue",
           "color": "#000000",
           "align": "left",
-          "bullet": "•"
+          "vAlign": "middle",
+          "bullet": "•",
+          "spaceBeforePt": 59,
+          "bulletSizePct": 125,
+          "indentPt": 50
         },
         {
           "role": "sldNum",
@@ -521,7 +556,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         }
       ]
     },
@@ -541,7 +577,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         },
         {
           "role": "title",
@@ -556,7 +593,8 @@
           "sizePt": 112,
           "font": "Helvetica Neue Medium",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "middle"
         },
         {
           "role": "body",
@@ -572,7 +610,11 @@
           "font": "Helvetica Neue",
           "color": "#000000",
           "align": "left",
-          "bullet": "•"
+          "vAlign": "top",
+          "bullet": "•",
+          "spaceBeforePt": 45,
+          "bulletSizePct": 125,
+          "indentPt": 44
         },
         {
           "role": "sldNum",
@@ -587,7 +629,8 @@
           "sizePt": 24,
           "font": "Helvetica Neue Light",
           "color": "#000000",
-          "align": "center"
+          "align": "center",
+          "vAlign": "top"
         }
       ]
     }

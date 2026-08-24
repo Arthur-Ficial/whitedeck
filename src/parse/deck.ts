@@ -27,6 +27,10 @@ export interface Deck {
 }
 
 const CLASS_DIRECTIVE = /<!--\s*_class:\s*([\w-]+)\s*-->/;
+const INLINE_CODE = /`([^`]*)`/g;
+
+/** Keynote has no code styling - inline code markers are stripped everywhere for fidelity. */
+const plainText = (value: string): string => value.replace(INLINE_CODE, '$1').trim();
 const IMAGE = /!\[[^\]]*\]\(([^)]+)\)/g;
 const BULLET = /^(\s*)[-*]\s+(.*)$/;
 const ATTRIBUTION = /^(?:--|—)\s*(.*)$/;
@@ -53,11 +57,11 @@ const parseLine = (line: string, slide: MutableSlide): void => {
     return;
   }
   if (line.startsWith('# ')) {
-    slide.title = line.slice(2).trim();
+    slide.title = plainText(line.slice(2));
     return;
   }
   if (line.startsWith('## ')) {
-    slide.subtitle = line.slice(3).trim();
+    slide.subtitle = plainText(line.slice(3));
     return;
   }
   if (line.startsWith('>')) {
@@ -69,11 +73,11 @@ const parseLine = (line: string, slide: MutableSlide): void => {
   }
   const bullet = BULLET.exec(line);
   if (bullet?.[1] !== undefined && bullet[2] !== undefined) {
-    slide.bullets.push({ text: bullet[2].trim(), level: Math.floor(bullet[1].length / 2) });
+    slide.bullets.push({ text: plainText(bullet[2]), level: Math.floor(bullet[1].length / 2) });
     return;
   }
   if (line.trim().length > 0) {
-    slide.bullets.push({ text: line.trim(), level: 0 });
+    slide.bullets.push({ text: plainText(line), level: 0 });
   }
 };
 

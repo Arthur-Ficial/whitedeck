@@ -1,4 +1,4 @@
-import type { PlaceholderRole, TextAlign } from './types.js';
+import type { PlaceholderRole, TextAlign, VerticalAlign } from './types.js';
 
 export interface RawShape {
   readonly role: PlaceholderRole;
@@ -11,7 +11,11 @@ export interface RawShape {
   readonly font?: string;
   readonly color?: string;
   readonly align?: TextAlign;
+  readonly vAlign?: VerticalAlign;
   readonly bullet?: string | null;
+  readonly spaceBeforePt?: number;
+  readonly bulletSizePct?: number;
+  readonly indentPt?: number;
 }
 
 export interface RawStyleDefaults {
@@ -20,6 +24,9 @@ export interface RawStyleDefaults {
   readonly color: string;
   readonly align: TextAlign;
   readonly bullet?: string;
+  readonly spaceBeforePt?: number;
+  readonly bulletSizePct?: number;
+  readonly indentPt?: number;
 }
 
 const ALIGN_MAP: Record<string, TextAlign> = {
@@ -27,6 +34,12 @@ const ALIGN_MAP: Record<string, TextAlign> = {
   ctr: 'center',
   r: 'right',
   just: 'justify',
+};
+
+const ANCHOR_MAP: Record<string, VerticalAlign> = {
+  t: 'top',
+  ctr: 'middle',
+  b: 'bottom',
 };
 
 export const decodeXmlEntities = (value: string): string =>
@@ -66,6 +79,9 @@ export const parseShape = (block: string): RawShape | undefined => {
   const color = firstMatch(block, /<a:srgbClr val="([0-9A-Fa-f]{6})"/);
   const buChar = firstMatch(block, /buChar char="([^"]*)"/);
   const hasBuNone = block.includes('<a:buNone');
+  const spacing = parseSpacing(block);
+  const anchor = /<a:bodyPr[^>]*anchor="(\w+)"/.exec(block)?.[1];
+  const vAlign = anchor !== undefined ? ANCHOR_MAP[anchor] : undefined;
 
   return {
     role,
@@ -76,7 +92,25 @@ export const parseShape = (block: string): RawShape | undefined => {
     ...(font !== undefined && { font }),
     ...(color !== undefined && { color: `#${color.toUpperCase()}` }),
     ...(algn !== undefined && ALIGN_MAP[algn] !== undefined && { align: ALIGN_MAP[algn] }),
+    ...(vAlign !== undefined && { vAlign }),
     ...(buChar !== undefined ? { bullet: buChar } : hasBuNone ? { bullet: null } : {}),
+    ...spacing,
+  };
+};
+
+const EMU_PER_PT = 12700;
+
+/** Paragraph spacing facts: space-before (centipoints), bullet scale (%), left indent (EMU). */
+const parseSpacing = (
+  block: string,
+): { spaceBeforePt?: number; bulletSizePct?: number; indentPt?: number } => {
+  const spcBef = /<a:spcBef>\s*<a:spcPts val="(\d+)"/.exec(block)?.[1];
+  const buSz = /buSzPct val="(\d+)"/.exec(block)?.[1];
+  const marL = /marL="(\d+)"/.exec(block)?.[1];
+  return {
+    ...(spcBef !== undefined && { spaceBeforePt: Number(spcBef) / 100 }),
+    ...(buSz !== undefined && { bulletSizePct: Number(buSz) / 1000 }),
+    ...(marL !== undefined && Number(marL) > 0 && { indentPt: Number(marL) / EMU_PER_PT }),
   };
 };
 
@@ -92,5 +126,6 @@ export const parseStyleDefaults = (styleXml: string, fallbackFont: string): RawS
     color: color !== undefined ? `#${color.toUpperCase()}` : '#000000',
     align: (algn !== undefined ? ALIGN_MAP[algn] : undefined) ?? 'left',
     ...(bullet !== undefined && { bullet }),
+    ...parseSpacing(styleXml),
   };
 };

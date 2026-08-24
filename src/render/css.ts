@@ -32,27 +32,41 @@ const text = (ph: ThemePlaceholder): string =>
 
 const rule = (selector: string, body: string): string => `${selector} {\n${body}\n}`;
 
-const titleRule = (id: string, ph: ThemePlaceholder): string =>
-  rule(
-    `section.${id} h1`,
-    `${box(ph)}\n${text(ph)}\n  display: flex;\n  flex-direction: column;\n  justify-content: center;`,
-  );
+const FLEX_JUSTIFY: Readonly<Record<string, string>> = {
+  top: 'flex-start',
+  middle: 'center',
+  bottom: 'flex-end',
+};
 
-const bulletBodyRule = (id: string, ph: ThemePlaceholder): string =>
-  [
-    rule(`section.${id} p, section.${id} ul`, `${box(ph)}\n${text(ph)}`),
+const flexV = (ph: ThemePlaceholder): string =>
+  `  display: flex;\n  flex-direction: column;\n  justify-content: ${FLEX_JUSTIFY[ph.vAlign] ?? 'flex-start'};`;
+
+const titleRule = (id: string, ph: ThemePlaceholder): string =>
+  rule(`section.${id} h1`, `${box(ph)}\n${text(ph)}\n${flexV(ph)}`);
+
+const bulletBodyRule = (id: string, ph: ThemePlaceholder): string => {
+  const indentPx = ph.indentPt !== undefined ? Math.round((ph.indentPt * 4) / 3) : INDENT_STEP_PX;
+  return [
+    rule(`section.${id} p:not(:has(> img)), section.${id} ul`, `${box(ph)}\n${text(ph)}\n${flexV(ph)}`),
     rule(`section.${id} ul`, '  list-style: none;'),
-    rule(`section.${id} li`, `  padding-left: ${INDENT_STEP_PX}px;\n  text-indent: -${INDENT_STEP_PX}px;`),
-    rule(`section.${id} li::before`, `  content: "${ph.bullet ?? '•'}";\n  margin-right: 0.45em;`),
-    rule(`section.${id} ul ul`, `  position: static;\n  width: auto;\n  height: auto;\n  margin-left: ${INDENT_STEP_PX}px;`),
+    rule(`section.${id} li`, `  padding-left: ${indentPx}px;\n  text-indent: -${indentPx}px;`),
+    ...(ph.spaceBeforePt !== undefined
+      ? [rule(`section.${id} li + li`, `  margin-top: ${ph.spaceBeforePt}pt;`)]
+      : []),
+    rule(
+      `section.${id} li::before`,
+      `  content: "${ph.bullet ?? '•'}";\n  margin-right: 0.45em;\n  font-size: ${ph.bulletSizePct ?? 100}%;\n  line-height: 0;`,
+    ),
+    rule(`section.${id} ul ul`, `  position: static;\n  width: auto;\n  height: auto;\n  margin-left: ${indentPx}px;\n  margin-top: ${ph.spaceBeforePt ?? 0}pt;`),
   ].join('\n');
+};
 
 const subtitleRule = (id: string, ph: ThemePlaceholder): string =>
-  rule(`section.${id} h2, section.${id} p`, `${box(ph)}\n${text(ph)}`);
+  rule(`section.${id} h2, section.${id} p:not(:has(> img))`, `${box(ph)}\n${text(ph)}\n${flexV(ph)}`);
 
 const quoteRules = (id: string, quotePh: ThemePlaceholder, attributionPh: ThemePlaceholder): string =>
   [
-    rule(`section.${id} blockquote`, `${box(quotePh)}\n${text(quotePh)}\n  margin: 0;`),
+    rule(`section.${id} blockquote`, `${box(quotePh)}\n${text(quotePh)}\n${flexV(quotePh)}\n  margin: 0;`),
     rule(
       `section.${id} blockquote p`,
       '  position: static;\n  width: auto;\n  height: auto;\n  font-size: inherit;\n  text-align: inherit;',
@@ -104,6 +118,7 @@ export const themeCss = (): string => {
       ].join('\n'),
     ),
     rule('section h1, section h2, section p, section ul, section blockquote', '  margin: 0;'),
+    rule('section p:has(> img)', '  display: contents;'),
     rule('section img', '  position: absolute;'),
   ];
   const layouts = LAYOUT_IDS.map((id) => layoutRules(id, layoutOf(id)));

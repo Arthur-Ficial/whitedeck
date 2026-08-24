@@ -24,6 +24,12 @@ const DEMO_MD = [
   '<!-- _class: quote -->',
   '> "Real artists ship."',
   '> -- Steve Jobs',
+  '',
+  '---',
+  '',
+  '<!-- _class: photo-horizontal -->',
+  '# The ocean',
+  '![](examples/ocean.png)',
 ].join('\n');
 
 const QUERY_SCRIPT = `
@@ -57,11 +63,12 @@ describe.skipIf(!onMacWithKeynote)('renderKey (real Keynote.app)', () => {
     const raw = await runAppleScript(QUERY_SCRIPT, [outPath]);
     const [count, size, masters, firstTitle] = raw.split('§');
 
-    expect(count).toBe('3');
+    expect(count).toBe('4');
     expect(size).toBe('1920x1080');
     expect(firstTitle).toBe('Native Deck');
     const masterNames = (masters ?? '').split('|');
     expect(masterNames[1]).toBe('Title & Bullets');
     expect(masterNames[2]).toBe('Quote');
+    expect(masterNames[3]).toBe('Photo - Horizontal');
   });
 });

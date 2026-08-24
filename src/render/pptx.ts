@@ -20,7 +20,12 @@ interface TextBoxOptions {
 
 interface TextItem {
   text: string;
-  options: { bullet: { code: string } | boolean; indentLevel: number; breakLine: boolean };
+  options: {
+    bullet: { code: string; indent?: number } | boolean;
+    indentLevel: number;
+    breakLine: boolean;
+    paraSpaceBefore?: number;
+  };
 }
 
 interface ImageOptions {
@@ -55,6 +60,7 @@ const inch = (emu: number): number => emu / EMU_PER_INCH;
 const BULLET_CODE = '2022';
 
 const textOptions = (ph: ThemePlaceholder): TextBoxOptions => ({
+  valign: ph.vAlign,
   x: inch(ph.xEmu),
   y: inch(ph.yEmu),
   w: inch(ph.wEmu),
@@ -70,12 +76,16 @@ const addBullets = (target: PptxSlide, ph: ThemePlaceholder, slide: DeckSlide): 
   const items: TextItem[] = slide.bullets.map((bullet) => ({
     text: bullet.text,
     options: {
-      bullet: ph.bullet !== undefined ? { code: BULLET_CODE } : false,
+      bullet:
+        ph.bullet !== undefined
+          ? { code: BULLET_CODE, ...(ph.indentPt !== undefined && { indent: ph.indentPt }) }
+          : false,
       indentLevel: bullet.level,
       breakLine: true,
+      ...(ph.spaceBeforePt !== undefined && { paraSpaceBefore: ph.spaceBeforePt }),
     },
   }));
-  target.addText(items, { ...textOptions(ph), valign: 'top' });
+  target.addText(items, textOptions(ph));
 };
 
 const addQuote = (target: PptxSlide, layout: ThemeLayout, slide: DeckSlide): void => {
@@ -83,10 +93,10 @@ const addQuote = (target: PptxSlide, layout: ThemeLayout, slide: DeckSlide): voi
   const quotePh = bodies[0];
   const attributionPh = bodies[1];
   if (slide.quote !== undefined && quotePh) {
-    target.addText(slide.quote, { ...textOptions(quotePh), valign: 'middle' });
+    target.addText(slide.quote, textOptions(quotePh));
   }
   if (slide.attribution !== undefined && attributionPh) {
-    target.addText(`—${slide.attribution}`, { ...textOptions(attributionPh), valign: 'middle' });
+    target.addText(`—${slide.attribution}`, textOptions(attributionPh));
   }
 };
 
@@ -111,7 +121,7 @@ const addSlideContent = (target: PptxSlide, slide: DeckSlide): void => {
 
   const titlePh = layout.placeholders.find((p) => p.role === 'title');
   if (titlePh && slide.title !== undefined) {
-    target.addText(slide.title, { ...textOptions(titlePh), valign: 'middle' });
+    target.addText(slide.title, textOptions(titlePh));
   }
 
   if (slide.layout === 'quote') {
@@ -121,7 +131,7 @@ const addSlideContent = (target: PptxSlide, slide: DeckSlide): void => {
     if (bodyPh) {
       if (slide.bullets.length > 0) addBullets(target, bodyPh, slide);
       if (slide.subtitle !== undefined) {
-        target.addText(slide.subtitle, { ...textOptions(bodyPh), valign: 'middle' });
+        target.addText(slide.subtitle, textOptions(bodyPh));
       }
     }
   }

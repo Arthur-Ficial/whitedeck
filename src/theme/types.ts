@@ -2,6 +2,8 @@ export type PlaceholderRole = 'title' | 'body' | 'pic' | 'sldNum';
 
 export type TextAlign = 'left' | 'center' | 'right' | 'justify';
 
+export type VerticalAlign = 'top' | 'middle' | 'bottom';
+
 export interface ThemePlaceholder {
   readonly role: PlaceholderRole;
   readonly idx?: number;
@@ -17,7 +19,11 @@ export interface ThemePlaceholder {
   readonly font: string;
   readonly color: string;
   readonly align: TextAlign;
+  readonly vAlign: VerticalAlign;
   readonly bullet?: string;
+  readonly spaceBeforePt?: number;
+  readonly bulletSizePct?: number;
+  readonly indentPt?: number;
 }
 
 export interface ThemeLayout {

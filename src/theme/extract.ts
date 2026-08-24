@@ -76,6 +76,9 @@ const resolvePlaceholder = (shape: RawShape, master: MasterInfo): ThemePlacehold
   if (xEmu === undefined || yEmu === undefined || wEmu === undefined || hEmu === undefined) return undefined;
 
   const bullet = shape.bullet !== undefined ? shape.bullet : (inherited?.bullet ?? style.bullet);
+  const spaceBeforePt = shape.spaceBeforePt ?? inherited?.spaceBeforePt ?? style.spaceBeforePt;
+  const bulletSizePct = shape.bulletSizePct ?? inherited?.bulletSizePct ?? style.bulletSizePct;
+  const indentPt = shape.indentPt ?? inherited?.indentPt ?? style.indentPt;
   return {
     role: shape.role,
     ...(shape.idx !== undefined && { idx: shape.idx }),
@@ -91,7 +94,11 @@ const resolvePlaceholder = (shape: RawShape, master: MasterInfo): ThemePlacehold
     font: shape.font ?? inherited?.font ?? style.font,
     color: shape.color ?? inherited?.color ?? style.color,
     align: shape.align ?? inherited?.align ?? style.align,
+    vAlign: shape.vAlign ?? inherited?.vAlign ?? 'top',
     ...(bullet !== null && bullet !== undefined && { bullet }),
+    ...(bullet !== null && bullet !== undefined && spaceBeforePt !== undefined && { spaceBeforePt }),
+    ...(bullet !== null && bullet !== undefined && bulletSizePct !== undefined && { bulletSizePct }),
+    ...(bullet !== null && bullet !== undefined && indentPt !== undefined && { indentPt }),
   };
 };
 
