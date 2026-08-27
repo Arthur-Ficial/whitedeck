@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { inlineToHtml } from '../parse/inline.js';
 import { layoutOf } from '../theme/white.js';
 /* Keynote shrinks overflowing placeholder text; CSS cannot, so the emitted markdown
@@ -33,6 +35,24 @@ const columnsHtml = (slide) => {
         .join('');
     return `<div class="cols">${cols}</div>`;
 };
+/* Marp copies the markdown into a temp dir, so relative image paths must be
+   resolved against the build cwd (the deck's directory) - and CommonMark cannot
+   parse a destination containing spaces or parentheses, so the absolute path is
+   percent-encoded. A missing image file fails the build loudly instead of
+   shipping a blank slide. */
+const marpImageRef = (image) => {
+    if (/^(https?:|data:)/i.test(image))
+        return image;
+    const abs = resolve(image);
+    if (!existsSync(abs))
+        throw new Error(`image not found: ${image} (resolved to ${abs})`);
+    return abs
+        .split('/')
+        .map((part) => encodeURIComponent(part))
+        .join('/')
+        .replaceAll('(', '%28')
+        .replaceAll(')', '%29');
+};
 const slideMarkdown = (slide) => {
     const lines = [`<!-- _class: ${slide.layout} -->`];
     if (slide.title !== undefined) {
@@ -52,7 +72,7 @@ const slideMarkdown = (slide) => {
     if (slide.subtitle !== undefined)
         lines.push(`## ${slide.subtitle}`);
     for (const image of slide.images)
-        lines.push(`![](${image})`);
+        lines.push(`![](${marpImageRef(image)})`);
     for (const bullet of slide.bullets)
         lines.push(`${'  '.repeat(bullet.level)}- ${bullet.text}`);
     if (slide.quote !== undefined)

@@ -150,13 +150,16 @@ const compareRules = (): string => {
   return [
     titleRule('compare', title),
     rule('section.compare .cols', `${box(body)}\n  display: flex;\n  gap: ${indentPx * 2}px;`),
-    rule('section.compare .col ', '  flex: 1;'),
+    rule('section.compare .col ', '  flex: 1;\n  min-width: 0;'),
     rule(
       'section.compare .col h3',
       `  font-size: ${body.sizePt}pt;\n  font-family: ${FONT_STACK};\n  font-weight: 500;\n  margin: 0;`,
     ),
     rule('section.compare .col ul', `  list-style: none;\n  padding: 0;\n  margin: 0;\n  font-size: ${body.sizePt}pt;`),
-    rule('section.compare .col li', `  padding-left: ${indentPx}px;\n  text-indent: -${indentPx}px;`),
+    rule(
+      'section.compare .col li',
+      `  padding-left: ${indentPx}px;\n  text-indent: -${indentPx}px;\n  overflow-wrap: anywhere;`,
+    ),
     rule('section.compare .col li, section.compare .col h3 + ul li:first-child', `  margin-top: ${body.spaceBeforePt ?? 0}pt;`),
     rule(
       'section.compare .col li::before',

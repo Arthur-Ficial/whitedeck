@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseDeck } from '../parse/deck.js';
 import { toMarpMarkdown } from './marp-md.js';
@@ -22,5 +25,27 @@ describe('toMarpMarkdown', () => {
     const long = 'This headline is far too long to fit the Keynote title box at full size';
     const md = toMarpMarkdown(parseDeck(`<!-- _class: title-bullets -->\n# ${long}\n- first bullet\n- second bullet`));
     expect(md).toMatch(/<\/h1>\n\n- first bullet/);
+  });
+});
+
+describe('image references for Marp', () => {
+  it('emits local images as percent-encoded absolute paths so spaces survive CommonMark', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'whitedeck img test '));
+    const img = join(dir, 'chart one.png');
+    writeFileSync(img, 'png');
+    const md = toMarpMarkdown(parseDeck(`<!-- _class: photo-vertical -->\n# A headline for the photo slide test\n![](${img})`));
+    expect(md).not.toContain('chart one.png');
+    expect(md).toContain(encodeURIComponent('chart one.png'));
+    expect(md).toMatch(/!\[\]\(\/[^ )]+\)/);
+  });
+
+  it('fails the build loudly when a referenced image does not exist', () => {
+    const deck = parseDeck('<!-- _class: photo-vertical -->\n# A headline for the photo slide test\n![](charts/does-not-exist.png)');
+    expect(() => toMarpMarkdown(deck)).toThrow(/image not found/);
+  });
+
+  it('passes http and data URIs through untouched', () => {
+    const deck = parseDeck('<!-- _class: photo-vertical -->\n# A headline for the photo slide test\n![](https://example.com/a b.png)');
+    expect(toMarpMarkdown(deck)).toContain('![](https://example.com/a b.png)');
   });
 });
