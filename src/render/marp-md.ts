@@ -23,6 +23,29 @@ const fittedTitleSizePt = (title: string, layoutId: string): number => {
   return MIN_TITLE_PT;
 };
 
+/* The Keynote quote box is one-liner geometry (87px high); a long quote must
+   shrink and let the box grow toward the attribution, exactly like Keynote's
+   shrink-to-fit - otherwise the text paints over the attribution line. */
+const QUOTE_MAX_HPX = 290;
+const MIN_QUOTE_PT = 24;
+
+const quoteLine = (slide: DeckSlide, quote: string): string => {
+  const phs = layoutOf(slide.layout)
+    .placeholders.filter((p) => p.role === 'body')
+    .sort((a, b) => b.sizePt - a.sizePt);
+  const ph = phs[0];
+  if (!ph) return `> ${quote}`;
+  const fits = (size: number): boolean => {
+    const glyphPx = size * PX_PER_PT * AVG_GLYPH_EM;
+    const lines = Math.max(1, Math.ceil((quote.length * glyphPx) / ph.wPx));
+    return lines * size * PX_PER_PT * LINE_HEIGHT_EM <= QUOTE_MAX_HPX;
+  };
+  let size = ph.sizePt;
+  while (size > MIN_QUOTE_PT && !fits(size)) size -= 2;
+  if (size === ph.sizePt) return `> ${quote}`;
+  return `<blockquote style="font-size: ${size}pt; height: auto; max-height: ${QUOTE_MAX_HPX}px"><p>${inlineToHtml(quote)}</p></blockquote>`;
+};
+
 const titleLine = (slide: DeckSlide): string => {
   const title = slide.title ?? '';
   const size = fittedTitleSizePt(title, slide.layout);
@@ -76,7 +99,7 @@ const slideMarkdown = (slide: DeckSlide): string => {
   if (slide.subtitle !== undefined) lines.push(`## ${slide.subtitle}`);
   for (const image of slide.images) lines.push(`![](${marpImageRef(image)})`);
   for (const bullet of slide.bullets) lines.push(`${'  '.repeat(bullet.level)}- ${bullet.text}`);
-  if (slide.quote !== undefined) lines.push(`> ${slide.quote}`);
+  if (slide.quote !== undefined) lines.push(quoteLine(slide, slide.quote), '');
   if (slide.attribution !== undefined) lines.push('', `—${slide.attribution}`);
   if (slide.source !== undefined) lines.push('', `<footer>${inlineToHtml(slide.source)}</footer>`);
   return lines.join('\n');

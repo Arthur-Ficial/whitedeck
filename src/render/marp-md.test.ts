@@ -49,3 +49,20 @@ describe('image references for Marp', () => {
     expect(toMarpMarkdown(deck)).toContain('![](https://example.com/a b.png)');
   });
 });
+
+describe('quote shrink-to-fit', () => {
+  it('keeps short quotes at full size as plain markdown blockquotes', () => {
+    const md = toMarpMarkdown(parseDeck('<!-- _class: quote -->\n> "Short and sweet."\n> -- Someone'));
+    expect(md).toContain('> "Short and sweet."');
+    expect(md).not.toContain('<blockquote style');
+  });
+
+  it('shrinks a long quote and lets the box grow instead of painting over the attribution', () => {
+    const long = 'x'.repeat(450);
+    const md = toMarpMarkdown(parseDeck(`<!-- _class: quote -->\n> "${long}"\n> -- Someone`));
+    const m = /<blockquote style="font-size: (\d+)pt; height: auto/.exec(md);
+    expect(m).not.toBeNull();
+    expect(Number(m?.[1])).toBeLessThan(48);
+    expect(Number(m?.[1])).toBeGreaterThanOrEqual(24);
+  });
+});
