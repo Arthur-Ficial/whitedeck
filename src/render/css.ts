@@ -74,9 +74,52 @@ const quoteRules = (id: string, quotePh: ThemePlaceholder, attributionPh: ThemeP
     rule(`section.${id} > p`, `${box(attributionPh)}\n${text(attributionPh)}`),
   ].join('\n');
 
-const picRules = (id: string, pics: readonly ThemePlaceholder[]): string =>
+const TEXT_GAP_PX = 24;
+
+/**
+ * Keynote photo frames may start above the canvas and may run into the text
+ * placeholders below them. Clamp both edges so a contained image never gets cut
+ * off at the top nor overlaps the title/body underneath it.
+ */
+const overlapsX = (a: ThemePlaceholder, b: ThemePlaceholder): boolean =>
+  a.xPx < b.xPx + b.wPx && b.xPx < a.xPx + a.wPx;
+
+const picFrame = (ph: ThemePlaceholder, layout: ThemeLayout): ThemePlaceholder => {
+  const texts = layout.placeholders.filter((p) => p.role === 'title' || p.role === 'body');
+  const top = Math.max(ph.yPx, 0);
+  // Only text that sits UNDER the picture can be run into; text beside it
+  // (title-bullets-photo, photo-vertical) must not shorten the frame.
+  const below = texts.filter((p) => p.yPx > top && overlapsX(ph, p)).map((p) => p.yPx);
+  const limit = below.length > 0 ? Math.min(...below) - TEXT_GAP_PX : Number.POSITIVE_INFINITY;
+  const bottom = Math.min(ph.yPx + ph.hPx, limit);
+  // A contained image only ever shrinks to fit, so widening the frame to the
+  // slide's text column uses the empty side margins instead of wasting them -
+  // but only when no text shares the picture's vertical band.
+  const beside = texts.some((p) => p.yPx < bottom && top < p.yPx + p.hPx);
+  const column = beside
+    ? undefined
+    : texts.reduce<ThemePlaceholder | undefined>(
+        (widest, p) => (widest === undefined || p.wPx > widest.wPx ? p : widest),
+        undefined,
+      );
+  const wide = column !== undefined && column.wPx > ph.wPx;
+  return {
+    ...ph,
+    xPx: wide ? column.xPx : ph.xPx,
+    wPx: wide ? column.wPx : ph.wPx,
+    yPx: top,
+    hPx: Math.max(bottom - top, 1),
+  };
+};
+
+const picRules = (id: string, pics: readonly ThemePlaceholder[], layout: ThemeLayout): string =>
   pics
-    .map((ph, index) => rule(`section.${id} img:nth-of-type(${index + 1})`, `${box(ph)}\n  object-fit: cover;`))
+    .map((ph, index) =>
+      rule(
+        `section.${id} img:nth-of-type(${index + 1})`,
+        `${box(picFrame(ph, layout))}\n  object-fit: contain;\n  object-position: center center;`,
+      ),
+    )
     .join('\n');
 
 const layoutRules = (id: string, layout: ThemeLayout): string => {
@@ -96,7 +139,7 @@ const layoutRules = (id: string, layout: ThemeLayout): string => {
   }
 
   const pics = placeholdersByRole(layout, 'pic');
-  if (pics.length > 0) rules.push(picRules(id, pics));
+  if (pics.length > 0) rules.push(picRules(id, pics, layout));
 
   return rules.join('\n');
 };

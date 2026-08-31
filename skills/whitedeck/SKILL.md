@@ -49,15 +49,24 @@ MCP alternative: `claude mcp add whitedeck -- whitedeck-mcp`
 
 Slides separated by `---`; layout via directive comment. Front matter: title/author.
 
+**Blank lines are load-bearing.** Put one empty line after the `<!-- _class: ... -->`
+comment and one after the `#` headline, exactly as below. Without them the bullets or the
+image are swallowed into the headline's HTML block and the slide renders empty - and
+`whitedeck validate` still reports `ok: true`, so nothing warns you.
+
 ```markdown
 <!-- _class: title -->
+
 # Migration cut crawl errors by 92%
+
 ## SEO report, August 2026
 
 ---
 
 <!-- _class: title-bullets -->
+
 # 404s dropped from 1,240 to 96 in 14 days
+
 - Fixed via [redirect map](https://example.com/redirects)
 - Zero ranking loss in [GSC](https://search.google.com/search-console)
 
@@ -66,7 +75,9 @@ Source: [GSC Coverage report](https://search.google.com/search-console)
 ---
 
 <!-- _class: compare -->
+
 # New template loads 3x faster than old
+
 - **Before**
 - LCP 4.1s
 - 2.3 MB JS
@@ -77,7 +88,9 @@ Source: [GSC Coverage report](https://search.google.com/search-console)
 ---
 
 <!-- _class: photo-horizontal -->
+
 # Clicks doubled after the title rewrite
+
 ![](charts/gsc-clicks.png)
 
 Source: [GSC Performance](https://search.google.com/search-console/performance)
@@ -85,12 +98,18 @@ Source: [GSC Performance](https://search.google.com/search-console/performance)
 ---
 
 <!-- _class: quote -->
+
 > "Assertion headlines improve audience recall by ~30%"
 > -- Alley & Neeley, Penn State
 ```
 
 Layouts: `title` `title-center` `title-top` `title-bullets` `bullets` `title-bullets-photo`
 `photo` `photo-horizontal` `photo-vertical` `photo-3-up` `quote` `blank` `compare`
+
+**Subtitles (`##`) only work where the layout has a body placeholder:** `title`,
+`title-bullets`, `photo-*`. On `title-center` a `##` has nowhere to go and renders as ~4pt
+text in the top-left corner - put everything in the `#` headline instead. Use `title-center`
+for section dividers with one line of text.
 
 ## Rules of the tool
 
