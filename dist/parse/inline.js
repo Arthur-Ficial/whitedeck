@@ -42,3 +42,11 @@ export const inlineToPlain = (text) => stripEmphasis(parseInline(text)
     return s.text.trim() === s.url.trim() ? s.text : `${s.text} (${s.url})`;
 })
     .join(''));
+/**
+ * The text a renderer actually paints: link labels only (the href is never on
+ * the slide) and no emphasis markers. This is what a fit calculation must
+ * measure - `inlineToPlain` appends the URL and would over-estimate by far.
+ */
+export const inlineVisibleText = (text) => stripEmphasis(parseInline(text)
+    .map((s) => s.text)
+    .join(''));

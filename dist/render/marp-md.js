@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { inlineToHtml } from '../parse/inline.js';
+import { inlineToHtml, inlineVisibleText } from '../parse/inline.js';
 import { layoutOf } from '../theme/white.js';
 /* Keynote shrinks overflowing placeholder text; CSS cannot, so the emitted markdown
    carries a pre-computed size. Helvetica Neue metrics approximated: avg glyph 0.56em,
@@ -20,6 +20,46 @@ const fittedTitleSizePt = (title, layoutId) => {
             return size;
     }
     return MIN_TITLE_PT;
+};
+/* Keynote shrinks an overflowing bullet body exactly like it shrinks a title;
+   the pptx path gets that for free via pptxgenjs `fit: "shrink"`, but CSS has no
+   autofit, so the HTML/PDF path needs the same pre-computed size or long bullet
+   lists paint over the headline. */
+const MIN_BODY_PT = 16;
+const INDENT_STEP_PX = 67;
+const fittedBody = (bullets, layoutId) => {
+    const ph = layoutOf(layoutId).placeholders.find((p) => p.role === 'body');
+    if (!ph || bullets.length === 0)
+        return undefined;
+    const indentPx = ph.indentPt !== undefined ? Math.round((ph.indentPt * 4) / 3) : INDENT_STEP_PX;
+    const gapRatio = (ph.spaceBeforePt ?? 0) / ph.sizePt;
+    const measured = bullets.map((b) => ({
+        chars: inlineVisibleText(b.text).length,
+        wPx: Math.max(1, ph.wPx - indentPx * (b.level + 1)),
+    }));
+    const heightPx = (size) => {
+        const glyphPx = size * PX_PER_PT * AVG_GLYPH_EM;
+        const linePx = size * PX_PER_PT * LINE_HEIGHT_EM;
+        const gapPx = gapRatio * size * PX_PER_PT;
+        return measured.reduce((total, m, index) => total + Math.max(1, Math.ceil((m.chars * glyphPx) / m.wPx)) * linePx + (index > 0 ? gapPx : 0), 0);
+    };
+    let size = ph.sizePt;
+    while (size > MIN_BODY_PT && heightPx(size) > ph.hPx)
+        size -= 2;
+    return { sizePt: size, gapPt: Math.round(gapRatio * size), shrunk: size < ph.sizePt };
+};
+/* Marp scopes a `<style scoped>` block to the slide it sits on; the selector
+   repeats the layout class so it outranks the theme rule it overrides. */
+const bodyStyleTag = (slide) => {
+    const fit = fittedBody(slide.bullets, slide.layout);
+    if (!fit || !fit.shrunk)
+        return undefined;
+    return [
+        '<style scoped>',
+        `section.${slide.layout} ul { font-size: ${fit.sizePt}pt; }`,
+        `section.${slide.layout} li + li { margin-top: ${fit.gapPt}pt; }`,
+        '</style>',
+    ].join('\n');
 };
 /* The Keynote quote box is one-liner geometry (87px high); a long quote must
    shrink and let the box grow toward the attribution, exactly like Keynote's
@@ -97,6 +137,9 @@ const slideMarkdown = (slide) => {
         lines.push(`## ${slide.subtitle}`);
     for (const image of slide.images)
         lines.push(`![](${marpImageRef(image)})`);
+    const bodyStyle = bodyStyleTag(slide);
+    if (bodyStyle !== undefined)
+        lines.push('', bodyStyle, '');
     for (const bullet of slide.bullets)
         lines.push(`${'  '.repeat(bullet.level)}- ${bullet.text}`);
     if (slide.quote !== undefined)
