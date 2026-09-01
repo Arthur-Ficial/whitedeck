@@ -33,5 +33,12 @@ const stripEmphasis = (value) => value
  * become "text (url)", emphasis and code markers are removed.
  */
 export const inlineToPlain = (text) => stripEmphasis(parseInline(text)
-    .map((s) => (s.url !== undefined ? `${s.text} (${s.url})` : s.text))
+    .map((s) => {
+    if (s.url === undefined)
+        return s.text;
+    // A link whose label already IS its target must not be printed twice
+    // as "https://x (https://x)" - that is how a full-URL example reads
+    // on a Keynote slide.
+    return s.text.trim() === s.url.trim() ? s.text : `${s.text} (${s.url})`;
+})
     .join(''));
