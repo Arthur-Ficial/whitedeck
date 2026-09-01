@@ -1,15 +1,12 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { extname, join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { Deck, DeckSlide } from '../parse/deck.js';
 import { inlineToPlain } from '../parse/inline.js';
-import { layoutOf, placeholdersByRole } from '../theme/white.js';
+import { layoutOf } from '../theme/white.js';
+import { bodyFrame, EMU_PER_PT, fitted, imageBandFrame, sourceFrame } from './geometry.js';
 
 const execFileAsync = promisify(execFile);
-
-const EMU_PER_PT = 12700;
 
 /** Candidate Keynote master-slide names per whitedeck layout id (naming varies by Keynote version/locale). */
 const MASTER_CANDIDATES: Readonly<Record<string, readonly string[]>> = {
@@ -28,22 +25,49 @@ const MASTER_CANDIDATES: Readonly<Record<string, readonly string[]>> = {
   'compare': ['Title & Bullets'],
 };
 
+/**
+ * Layouts whose Keynote master carries a photo placeholder. That placeholder
+ * paints the theme's own stock photo, which stays visible behind a
+ * letterboxed chart - so image slides are built on a text master instead and
+ * whitedeck positions the picture itself.
+ */
+const TEXT_MASTER_FOR_IMAGES: Readonly<Record<string, string>> = {
+  'photo': 'title-bullets',
+  'photo-horizontal': 'title-bullets',
+  'photo-vertical': 'title-bullets',
+  'photo-3-up': 'title-bullets',
+  'title-bullets-photo': 'title-bullets',
+};
+
+/** The layout whose geometry AND master the .key renderer actually uses. */
+const keyLayoutId = (slide: DeckSlide): string =>
+  slide.images.length > 0 ? (TEXT_MASTER_FOR_IMAGES[slide.layout] ?? slide.layout) : slide.layout;
+
 const str = (value: string): string =>
   `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\t/g, '\\t')}"`;
 
 const list = (values: readonly string[]): string => `{${values.map((v) => str(v)).join(', ')}}`;
 
-const bodyText = (slide: DeckSlide): string | undefined => {
+/**
+ * Keynote has no inline markdown. Every string that reaches AppleScript must
+ * be flattened first, otherwise a link renders as literal
+ * "[label](https://...)" on the slide.
+ */
+export const bodyText = (slide: DeckSlide): string | undefined => {
+  const plain = (text: string): string => inlineToPlain(text);
   if (slide.columns !== undefined && slide.columns.length > 0) {
     return slide.columns
-      .map((col) => [col.header, ...col.bullets.map((b) => `\t${b.text}`)].join('\n'))
+      .map((col) => [plain(col.header), ...col.bullets.map((b) => `\t${plain(b.text)}`)].join('\n'))
       .join('\n');
   }
   if (slide.quote !== undefined) {
-    return slide.attribution !== undefined ? `${slide.quote}\n—${slide.attribution}` : slide.quote;
+    const quote = plain(slide.quote);
+    return slide.attribution !== undefined ? `${quote}\n—${plain(slide.attribution)}` : quote;
   }
-  if (slide.bullets.length > 0) return slide.bullets.map((b) => '\t'.repeat(b.level) + b.text).join('\n');
-  return slide.subtitle;
+  if (slide.bullets.length > 0) {
+    return slide.bullets.map((b) => '\t'.repeat(b.level) + plain(b.text)).join('\n');
+  }
+  return slide.subtitle === undefined ? undefined : plain(slide.subtitle);
 };
 
 interface PlacedImage {
@@ -51,38 +75,29 @@ interface PlacedImage {
   readonly xPt: number;
   readonly yPt: number;
   readonly wPt: number;
+  readonly hPt: number;
 }
 
-const imageDimensions = async (path: string): Promise<{ w: number; h: number }> => {
-  const { stdout } = await execFileAsync('sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', path]);
-  const w = /pixelWidth: (\d+)/.exec(stdout)?.[1];
-  const h = /pixelHeight: (\d+)/.exec(stdout)?.[1];
-  if (!w || !h) throw new Error(`Cannot read image dimensions of ${path}`);
-  return { w: Number(w), h: Number(h) };
-};
-
-/** Center-crop a copy of the image to the placeholder aspect so it fills the box like a
-    Keynote media placeholder (AppleScript cannot crop, so we crop the file itself). */
-const cropToAspect = async (src: string, aspect: number, workDir: string, index: number): Promise<string> => {
-  const { w, h } = await imageDimensions(src);
-  const cropW = w / h > aspect ? Math.round(h * aspect) : w;
-  const cropH = w / h > aspect ? h : Math.round(w / aspect);
-  const out = join(workDir, `img-${index}${extname(src)}`);
-  await execFileAsync('sips', ['-c', String(cropH), String(cropW), src, '--out', out]);
-  return out;
-};
-
-const placeImages = async (slide: DeckSlide, workDir: string, offset: number): Promise<PlacedImage[]> => {
-  const pics = placeholdersByRole(layoutOf(slide.layout), 'pic');
-  const placed: PlacedImage[] = [];
-  for (const [index, image] of slide.images.entries()) {
-    const ph = pics[index] ?? pics[0];
-    if (!ph) continue;
-    const pt = (emu: number): number => Math.round(emu / EMU_PER_PT);
-    const path = await cropToAspect(resolve(image), ph.wEmu / ph.hEmu, workDir, offset + index);
-    placed.push({ path, xPt: pt(ph.xEmu), yPt: pt(ph.yEmu), wPt: pt(ph.wEmu) });
-  }
-  return placed;
+/**
+ * Place each image with the SAME geometry the pptx and CSS renderers use:
+ * clamp the Keynote photo frame to the canvas, stop it above the text below
+ * it, then letterbox-fit the picture inside. Never crop - a cropped chart
+ * loses data - and never overlap the title.
+ */
+const placeImages = (slide: DeckSlide): PlacedImage[] => {
+  const layout = layoutOf(keyLayoutId(slide));
+  const pt = (emu: number): number => Math.round(emu / EMU_PER_PT);
+  const frame = imageBandFrame(layout, slide.source !== undefined);
+  return slide.images.map((image) => {
+    const rect = fitted(resolve(image), frame);
+    return {
+      path: resolve(image),
+      xPt: pt(rect.x),
+      yPt: pt(rect.y),
+      wPt: pt(rect.w),
+      hPt: pt(rect.h),
+    };
+  });
 };
 
 const imageStatements = (images: readonly PlacedImage[]): string[] =>
@@ -91,25 +106,47 @@ const imageStatements = (images: readonly PlacedImage[]): string[] =>
     'tell s',
     '  set img to make new image with properties {file:imgFile}',
     'end tell',
-    `set position of img to {${image.xPt}, ${image.yPt}}`,
     `set width of img to ${image.wPt}`,
+    `set height of img to ${image.hPt}`,
+    `set position of img to {${image.xPt}, ${image.yPt}}`,
   ]);
 
 const slideStatements = (slide: DeckSlide, images: readonly PlacedImage[]): string[] => {
   const body = bodyText(slide);
+  const layoutId = keyLayoutId(slide);
+  const layout = layoutOf(layoutId);
+  const pt = (emu: number): number => Math.round(emu / EMU_PER_PT);
+  const src = sourceFrame(layout, body !== undefined);
   return [
-    `set m to my pickMaster(d, ${list(MASTER_CANDIDATES[slide.layout] ?? ['Blank'])})`,
+    `set m to my pickMaster(d, ${list(MASTER_CANDIDATES[layoutId] ?? ['Blank'])})`,
     'set s to make new slide at d with properties {base slide:m}',
-    ...(slide.title !== undefined ? [`set object text of default title item of s to ${str(slide.title)}`] : []),
-    ...(body !== undefined ? [`set object text of default body item of s to ${str(body)}`] : []),
+    ...(slide.title !== undefined
+      ? [
+          'set title showing of s to true',
+          `set object text of default title item of s to ${str(inlineToPlain(slide.title))}`,
+        ]
+      : ['set title showing of s to false']),
+    ...(body !== undefined
+      ? [
+          'set body showing of s to true',
+          `set object text of default body item of s to ${str(body)}`,
+          // fit the body above the source line - lift it when the Keynote
+          // placeholder starts inside the bottom band
+          `set width of default body item of s to ${pt(bodyFrame(layout, slide.source !== undefined).w)}`,
+          `set height of default body item of s to ${pt(bodyFrame(layout, slide.source !== undefined).h)}`,
+          `set position of default body item of s to {${pt(bodyFrame(layout, slide.source !== undefined).x)}, ${pt(bodyFrame(layout, slide.source !== undefined).y)}}`,
+        ]
+      : ['set body showing of s to false']),
     ...imageStatements(images),
     ...(slide.source !== undefined
       ? [
           'tell s',
           `  set srcItem to make new text item with properties {object text:${str(inlineToPlain(slide.source))}}`,
           'end tell',
-          'set position of srcItem to {133, 1020}',
-          'set size of object text of srcItem to 24',
+          `set width of srcItem to ${pt(src.w)}`,
+          `set height of srcItem to ${pt(src.h)}`,
+          `set position of srcItem to {${pt(src.x)}, ${pt(src.y)}}`,
+          'set size of object text of srcItem to 18',
         ]
       : []),
   ];
@@ -162,18 +199,10 @@ export const renderKey = async (deck: Deck, outPath: string): Promise<void> => {
     throw new Error('Native .key output requires macOS with Keynote.app installed');
   }
   const wasRunning = await keynoteIsRunning();
-  const workDir = await mkdtemp(join(tmpdir(), 'whitedeck-key-img-'));
   try {
-    const imagesPerSlide: PlacedImage[][] = [];
-    let offset = 0;
-    for (const slide of deck.slides) {
-      const placed = await placeImages(slide, workDir, offset);
-      imagesPerSlide.push(placed);
-      offset += placed.length;
-    }
+    const imagesPerSlide: PlacedImage[][] = deck.slides.map((slide) => placeImages(slide));
     await runAppleScript(buildScript(deck, imagesPerSlide, outPath));
   } finally {
-    await rm(workDir, { recursive: true, force: true });
     if (!wasRunning) await quitKeynoteIfIdle();
   }
 };

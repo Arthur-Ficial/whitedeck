@@ -29,8 +29,23 @@ export const inlineToHtml = (text: string): string =>
     .map((s) => (s.url !== undefined ? `<a href="${escapeHtml(s.url)}">${escapeHtml(s.text)}</a>` : escapeHtml(s.text)))
     .join('');
 
-/** Markdown links to plain "text (url)" for renderers without hyperlink support. */
+/**
+ * Strip the emphasis and code markers Keynote cannot render. Without this a
+ * bullet reaches the slide as literal "**IS**" or "`/de/p/123`".
+ */
+const stripEmphasis = (value: string): string =>
+  value
+    .replaceAll(/\*\*(.+?)\*\*/g, '$1')
+    .replaceAll(/__(.+?)__/g, '$1')
+    .replaceAll(/`([^`]+)`/g, '$1');
+
+/**
+ * Markdown to plain text for renderers without inline formatting: links
+ * become "text (url)", emphasis and code markers are removed.
+ */
 export const inlineToPlain = (text: string): string =>
-  parseInline(text)
-    .map((s) => (s.url !== undefined ? `${s.text} (${s.url})` : s.text))
-    .join('');
+  stripEmphasis(
+    parseInline(text)
+      .map((s) => (s.url !== undefined ? `${s.text} (${s.url})` : s.text))
+      .join(''),
+  );

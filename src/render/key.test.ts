@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseDeck } from '../parse/deck.js';
-import { renderKey, runAppleScript } from './key.js';
+import { bodyText, renderKey, runAppleScript } from './key.js';
 
 const onMacWithKeynote = process.platform === 'darwin' && existsSync('/Applications/Keynote.app');
 
@@ -69,6 +69,48 @@ describe.skipIf(!onMacWithKeynote)('renderKey (real Keynote.app)', () => {
     const masterNames = (masters ?? '').split('|');
     expect(masterNames[1]).toBe('Title & Bullets');
     expect(masterNames[2]).toBe('Quote');
-    expect(masterNames[3]).toBe('Photo - Horizontal');
+    // A slide carrying an image is built on a TEXT master on purpose: the
+    // "Photo - Horizontal" master paints the theme's own stock photograph,
+    // which stayed visible behind a letterboxed chart, and its picture
+    // placeholder overlaps the title box (pic y -31..921 vs title y 749..907).
+    // whitedeck positions the picture itself instead. See geometry.test.ts.
+    expect(masterNames[3]).toBe('Title & Bullets');
+  });
+});
+
+
+/**
+ * Keynote renders no inline markdown, so every string handed to AppleScript
+ * must already be flat. Regression: bullets and compare columns reached the
+ * slide as literal "[label](https://...)".
+ */
+describe('bodyText', () => {
+  const slide = (over: Record<string, unknown>) =>
+    ({ layout: 'title-bullets', bullets: [], images: [], ...over }) as never;
+
+  it('flattens markdown links in bullets', () => {
+    const text = bodyText(
+      slide({ bullets: [{ level: 0, text: '[example](https://www.example.com/)' }] }),
+    );
+    expect(text).not.toContain('](');
+    expect(text).toContain('example');
+  });
+
+  it('flattens markdown links in compare columns', () => {
+    const text = bodyText(
+      slide({
+        columns: [
+          { header: '**IS**', bullets: [{ level: 0, text: '[x](https://example.com/)' }] },
+        ],
+      }),
+    );
+    expect(text).not.toContain('](');
+    expect(text).not.toContain('**');
+  });
+
+  it('flattens a quote and its attribution', () => {
+    const text = bodyText(slide({ quote: '**bold** quote', attribution: '[F](https://f.at/)' }));
+    expect(text).not.toContain('](');
+    expect(text).not.toContain('**');
   });
 });

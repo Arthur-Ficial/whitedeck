@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs';
 
 import PptxGenJSImport from 'pptxgenjs';
 import type { Deck, DeckSlide } from '../parse/deck.js';
 import { parseInline } from '../parse/inline.js';
 import type { ThemeLayout, ThemePlaceholder } from '../theme/types.js';
 import { layoutOf, placeholdersByRole, WHITE } from '../theme/white.js';
+import { fitted, picFrame } from './geometry.js';
 
 /* pptxgenjs ships UMD-style typings that NodeNext ESM cannot resolve, so the
    exact API surface whitedeck uses is typed here and the constructor cast once. */
@@ -148,69 +148,7 @@ const addQuote = (target: PptxSlide, layout: ThemeLayout, slide: DeckSlide): voi
 };
 
 /** 24px of breathing room at 96dpi, expressed in EMU. */
-const TEXT_GAP_EMU = 228600;
 
-interface Rect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-/**
- * Keynote photo frames start above the slide, run into the text placeholders
- * below them and are narrower than the text column. Clamp both vertical edges
- * and widen to the text column, so an image is never cut off, never overlaps
- * the title and uses the empty side margins.
- */
-const overlapsX = (a: ThemePlaceholder, b: ThemePlaceholder): boolean =>
-  a.xEmu < b.xEmu + b.wEmu && b.xEmu < a.xEmu + a.wEmu;
-
-const picFrame = (ph: ThemePlaceholder, layout: ThemeLayout): Rect => {
-  const texts = layout.placeholders.filter((p) => p.role === 'title' || p.role === 'body');
-  const top = Math.max(ph.yEmu, 0);
-  // Only text that sits UNDER the picture can be run into; text beside it
-  // (title-bullets-photo, photo-vertical) must not shorten the frame.
-  const below = texts.filter((p) => p.yEmu > top && overlapsX(ph, p)).map((p) => p.yEmu);
-  const limit = below.length > 0 ? Math.min(...below) - TEXT_GAP_EMU : Number.POSITIVE_INFINITY;
-  const bottom = Math.min(ph.yEmu + ph.hEmu, limit);
-  const beside = texts.some((p) => p.yEmu < bottom && top < p.yEmu + p.hEmu);
-  const column = beside
-    ? undefined
-    : texts.reduce<ThemePlaceholder | undefined>(
-        (widest, p) => (widest === undefined || p.wEmu > widest.wEmu ? p : widest),
-        undefined,
-      );
-  const wide = column !== undefined && column.wEmu > ph.wEmu;
-  return {
-    x: wide ? column.xEmu : ph.xEmu,
-    y: top,
-    w: wide ? column.wEmu : ph.wEmu,
-    h: Math.max(bottom - top, 1),
-  };
-};
-
-/** PNG intrinsic size from the IHDR chunk; undefined for anything else. */
-const pngSize = (path: string): { w: number; h: number } | undefined => {
-  let head: Buffer;
-  try {
-    head = readFileSync(path).subarray(0, 24);
-  } catch {
-    return undefined;
-  }
-  if (head.length < 24 || head.readUInt32BE(0) !== 0x89504e47) return undefined;
-  return { w: head.readUInt32BE(16), h: head.readUInt32BE(20) };
-};
-
-/** Scale the image down into the frame, preserving aspect ratio, centred. */
-const fitted = (path: string, frame: Rect): Rect => {
-  const size = pngSize(path);
-  if (size === undefined || size.w === 0 || size.h === 0) return frame;
-  const scale = Math.min(frame.w / size.w, frame.h / size.h);
-  const w = size.w * scale;
-  const h = size.h * scale;
-  return { x: frame.x + (frame.w - w) / 2, y: frame.y + (frame.h - h) / 2, w, h };
-};
 
 const addImages = (target: PptxSlide, layout: ThemeLayout, slide: DeckSlide): void => {
   const pics = placeholdersByRole(layout, 'pic');
