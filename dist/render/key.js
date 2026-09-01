@@ -98,6 +98,12 @@ const slideStatements = (slide, images) => {
     return [
         `set m to my pickMaster(d, ${list(MASTER_CANDIDATES[layoutId] ?? ['Blank'])})`,
         'set s to make new slide at d with properties {base slide:m}',
+        // Some White masters (Quote) carry plain TEXT ITEMS holding the theme's
+        // dummy copy - "Type a quote here.", "-Johnny Appleseed". They are not
+        // title/body placeholders, so `title showing`/`body showing` cannot hide
+        // them and they survive onto the finished slide. Remove them before we
+        // add our own content.
+        'my clearMasterText(s)',
         ...(slide.title !== undefined
             ? [
                 'set title showing of s to true',
@@ -130,6 +136,16 @@ const slideStatements = (slide, images) => {
     ];
 };
 const buildScript = (deck, imagesPerSlide, outPath) => [
+    'on clearMasterText(s)',
+    '  tell application "Keynote"',
+    '    try',
+    '      repeat with k from (count of text items of s) to 1 by -1',
+    '        delete text item k of s',
+    '      end repeat',
+    '    end try',
+    '  end tell',
+    'end clearMasterText',
+    '',
     'on pickMaster(d, candidateNames)',
     '  tell application "Keynote"',
     '    set masterNames to name of every master slide of d',
