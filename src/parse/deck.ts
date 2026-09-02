@@ -36,8 +36,29 @@ export interface Deck {
 const CLASS_DIRECTIVE = /<!--\s*_class:\s*([\w-]+)\s*-->/;
 const INLINE_CODE = /`([^`]*)`/g;
 
+/* A deck is markdown, not HTML: an author who writes about markup types either
+   `<title>` or `&lt;title&gt;`, and both must reach the slide as the same four
+   visible characters. Without this the Keynote and pptx renderers - which paint
+   the parsed string verbatim - print a literal "&lt;title&gt;" on the slide.
+   Decoding happens once, here, so every renderer works on real text; the
+   HTML/PDF path re-encodes on its way into Marp. */
+const NAMED: Record<string, string> = {
+  lt: '<', gt: '>', amp: '&', quot: '"', apos: "'", nbsp: '\u00a0',
+};
+const ENTITY = /&(#\d+|#[xX][0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g;
+const decodeEntities = (value: string): string =>
+  value.replaceAll(ENTITY, (whole, body: string) => {
+    if (body.startsWith('#')) {
+      const code = body[1] === 'x' || body[1] === 'X'
+        ? Number.parseInt(body.slice(2), 16)
+        : Number.parseInt(body.slice(1), 10);
+      return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : whole;
+    }
+    return NAMED[body.toLowerCase()] ?? whole;
+  });
+
 /** Keynote has no code styling - inline code markers are stripped everywhere for fidelity. */
-const plainText = (value: string): string => value.replace(INLINE_CODE, '$1').trim();
+const plainText = (value: string): string => decodeEntities(value.replace(INLINE_CODE, '$1')).trim();
 const IMAGE = /!\[[^\]]*\]\(([^)]+)\)/g;
 const BULLET = /^(\s*)[-*]\s+(.*)$/;
 const ATTRIBUTION = /^(?:--|—)\s*(.*)$/;
@@ -73,14 +94,14 @@ const parseLine = (line: string, slide: MutableSlide): void => {
     return;
   }
   if (line.startsWith('>')) {
-    const text = line.replace(/^>\s?/, '').trim();
+    const text = decodeEntities(line.replace(/^>\s?/, '')).trim();
     const attribution = ATTRIBUTION.exec(text);
     if (attribution?.[1] !== undefined) slide.attribution = attribution[1].trim();
     else if (text.length > 0) slide.quoteLines.push(text);
     return;
   }
   if (line.trimStart().startsWith('Source:')) {
-    slide.source = line.trim();
+    slide.source = decodeEntities(line).trim();
     return;
   }
   const bullet = BULLET.exec(line);

@@ -85,11 +85,21 @@ const quoteLine = (slide, quote) => {
         return `> ${quote}`;
     return `<blockquote style="font-size: ${size}pt; height: auto; max-height: ${QUOTE_MAX_HPX}px"><p>${inlineToHtml(quote)}</p></blockquote>`;
 };
+/* Marp runs with --html, so a bare "<" in a bullet or heading becomes a raw HTML
+   tag: `<title>` in the deck source (backticks stripped at parse time) reaches
+   the renderer as markup, disappears from the slide and destroys the page break.
+   The parser has already decoded every entity, so each of these three characters
+   is literal text by now and is encoded back on the way into the markdown -
+   CommonMark paints the entity as the character. Markdown syntax (links,
+   emphasis) stays untouched. */
+const HTML_TEXT = /[<>&]/g;
+const ENTITY = { '<': '&lt;', '>': '&gt;', '&': '&amp;' };
+const asMarkdownText = (value) => value.replaceAll(HTML_TEXT, (c) => ENTITY[c] ?? c);
 const titleLine = (slide) => {
     const title = slide.title ?? '';
     const size = fittedTitleSizePt(title, slide.layout);
     const full = layoutOf(slide.layout).placeholders.find((p) => p.role === 'title')?.sizePt ?? 0;
-    return size < full ? `<h1 style="font-size: ${size}pt">${inlineToHtml(title)}</h1>` : `# ${title}`;
+    return size < full ? `<h1 style="font-size: ${size}pt">${inlineToHtml(title)}</h1>` : `# ${asMarkdownText(title)}`;
 };
 const columnsHtml = (slide) => {
     const cols = (slide.columns ?? [])
@@ -134,14 +144,14 @@ const slideMarkdown = (slide) => {
         return lines.join('\n');
     }
     if (slide.subtitle !== undefined)
-        lines.push(`## ${slide.subtitle}`);
+        lines.push(`## ${asMarkdownText(slide.subtitle)}`);
     for (const image of slide.images)
         lines.push(`![](${marpImageRef(image)})`);
     const bodyStyle = bodyStyleTag(slide);
     if (bodyStyle !== undefined)
         lines.push('', bodyStyle, '');
     for (const bullet of slide.bullets)
-        lines.push(`${'  '.repeat(bullet.level)}- ${bullet.text}`);
+        lines.push(`${'  '.repeat(bullet.level)}- ${asMarkdownText(bullet.text)}`);
     if (slide.quote !== undefined)
         lines.push(quoteLine(slide, slide.quote), '');
     if (slide.attribution !== undefined)

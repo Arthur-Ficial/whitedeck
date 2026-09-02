@@ -113,3 +113,22 @@ describe('parseDeck', () => {
     expect(() => parseDeck('<!-- _class: does-not-exist -->\n# X')).toThrow(/does-not-exist/);
   });
 });
+
+describe('HTML entities in the source', () => {
+  it('decodes an escaped tag so the pptx and Keynote renderers paint real angle brackets', () => {
+    const deck = parseDeck('<!-- _class: title-bullets -->\n# The &lt;title&gt; rule\n- `&lt;title&gt;Monstera&lt;/title&gt;`\n');
+    expect(deck.slides[0]?.title).toBe('The <title> rule');
+    expect(deck.slides[0]?.bullets[0]?.text).toBe('<title>Monstera</title>');
+  });
+
+  it('decodes numeric and named entities and leaves an unknown one alone', () => {
+    const deck = parseDeck('<!-- _class: title-bullets -->\n# Entities\n- &#8364; 14,99 &amp; &#x2013; and &bogus;\n');
+    expect(deck.slides[0]?.bullets[0]?.text).toBe('€ 14,99 & – and &bogus;');
+  });
+
+  it('decodes a quote and its source line too', () => {
+    const deck = parseDeck('<!-- _class: quote -->\n> "Use &lt;h1&gt; once."\n> -- Someone\n\nSource: Tom &amp; Jerry');
+    expect(deck.slides[0]?.quote).toBe('"Use <h1> once."');
+    expect(deck.slides[0]?.source).toBe('Source: Tom & Jerry');
+  });
+});
