@@ -8,6 +8,8 @@ export interface DeckColumn {
 }
 export interface DeckSlide {
     readonly layout: string;
+    /** Per-slide background colour from `<!-- _background: #RRGGBB -->`. White when absent. */
+    readonly background?: string;
     readonly title?: string;
     readonly subtitle?: string;
     readonly bullets: readonly DeckBullet[];

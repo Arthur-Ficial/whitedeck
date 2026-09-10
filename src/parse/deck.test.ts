@@ -2,6 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { parseDeck } from './deck.js';
 
 describe('parseDeck', () => {
+  it('parses a per-slide _background directive and leaves other slides white', () => {
+    const deck = parseDeck(
+      '<!-- _class: title-bullets -->\n<!-- _background: #D6E9F8 -->\n# Q\n- a\n\n---\n\n<!-- _class: title-bullets -->\n# R\n- b',
+    );
+    expect(deck.slides[0]?.background).toBe('#D6E9F8');
+    expect(deck.slides[0]?.title).toBe('Q');
+    expect(deck.slides[0]?.bullets).toHaveLength(1);
+    expect(deck.slides[1]?.background).toBeUndefined();
+  });
+
+  it('does not treat the _background directive as bullet text', () => {
+    const deck = parseDeck('<!-- _class: title-bullets -->\n<!-- _background: cornflowerblue -->\n# T\n- only bullet');
+    expect(deck.slides[0]?.bullets.map((b) => b.text)).toEqual(['only bullet']);
+    expect(deck.slides[0]?.background).toBe('cornflowerblue');
+  });
+
   it('parses front matter, slide separators and explicit layout directives', () => {
     const deck = parseDeck(
       [

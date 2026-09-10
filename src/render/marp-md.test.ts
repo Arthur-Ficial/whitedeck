@@ -6,6 +6,20 @@ import { parseDeck } from '../parse/deck.js';
 import { toMarpMarkdown } from './marp-md.js';
 
 describe('toMarpMarkdown', () => {
+  it('emits a scoped background style for a slide that declares one', () => {
+    const md = toMarpMarkdown(
+      parseDeck('<!-- _class: title-bullets -->\n<!-- _background: #D6E9F8 -->\n# H\n- b'),
+    );
+    expect(md).toContain('<style scoped>');
+    expect(md).toContain('section { background: #D6E9F8; }');
+  });
+
+  it('renders a quote attribution with a plain hyphen, never an em dash', () => {
+    const md = toMarpMarkdown(parseDeck('<!-- _class: quote -->\n> "Q"\n> -- Someone, 2025'));
+    expect(md).toContain('<p>- Someone, 2025</p>');
+    expect(md).not.toContain('\u2014');
+  });
+
   it('emits short titles as plain markdown headings at full size', () => {
     const md = toMarpMarkdown(parseDeck('<!-- _class: title-bullets -->\n# Short title\n- a'));
     expect(md).toContain('# Short title');

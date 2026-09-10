@@ -129,6 +129,11 @@ const marpImageRef = (image) => {
 };
 const slideMarkdown = (slide) => {
     const lines = [`<!-- _class: ${slide.layout} -->`];
+    /* Marp scopes `<style scoped>` to its own slide, so a per-slide background needs
+       no theme change and cannot leak into the next slide. */
+    if (slide.background !== undefined) {
+        lines.push('', '<style scoped>', `section { background: ${slide.background}; }`, '</style>', '');
+    }
     if (slide.title !== undefined) {
         const title = titleLine(slide);
         lines.push(title);
@@ -155,7 +160,7 @@ const slideMarkdown = (slide) => {
     if (slide.quote !== undefined)
         lines.push(quoteLine(slide, slide.quote), '');
     if (slide.attribution !== undefined)
-        lines.push('', `—${slide.attribution}`);
+        lines.push('', `<p>- ${inlineToHtml(slide.attribution)}</p>`);
     if (slide.source !== undefined)
         lines.push('', `<footer>${inlineToHtml(slide.source)}</footer>`);
     return lines.join('\n');

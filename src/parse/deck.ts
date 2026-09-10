@@ -13,6 +13,8 @@ export interface DeckColumn {
 
 export interface DeckSlide {
   readonly layout: string;
+  /** Per-slide background colour from `<!-- _background: #RRGGBB -->`. White when absent. */
+  readonly background?: string;
   readonly title?: string;
   readonly subtitle?: string;
   readonly bullets: readonly DeckBullet[];
@@ -34,6 +36,10 @@ export interface Deck {
 }
 
 const CLASS_DIRECTIVE = /<!--\s*_class:\s*([\w-]+)\s*-->/;
+/* A slide may override the theme background - used for context slides that must read
+   as a different kind of slide (a client's own question, a section marker). Keynote
+   supports this per slide, so the renderers do too. */
+const BACKGROUND_DIRECTIVE = /<!--\s*_background:\s*(#[0-9a-fA-F]{3,8}|[a-zA-Z]+)\s*-->/;
 const INLINE_CODE = /`([^`]*)`/g;
 
 /* A deck is markdown, not HTML: an author who writes about markup types either
@@ -65,6 +71,7 @@ const ATTRIBUTION = /^(?:--|—)\s*(.*)$/;
 
 interface MutableSlide {
   layout?: string;
+  background?: string;
   title?: string;
   subtitle?: string;
   bullets: DeckBullet[];
@@ -78,6 +85,11 @@ const parseLine = (line: string, slide: MutableSlide): void => {
   const classMatch = CLASS_DIRECTIVE.exec(line);
   if (classMatch?.[1] !== undefined) {
     slide.layout = classMatch[1];
+    return;
+  }
+  const backgroundMatch = BACKGROUND_DIRECTIVE.exec(line);
+  if (backgroundMatch?.[1] !== undefined) {
+    slide.background = backgroundMatch[1];
     return;
   }
   const images = [...line.matchAll(IMAGE)].flatMap((m) => (m[1] !== undefined ? [m[1]] : []));
@@ -152,6 +164,7 @@ const finalizeSlide = (slide: MutableSlide, isFirst: boolean): DeckSlide => {
   const quote = slide.quoteLines.join(' ');
   return {
     layout,
+    ...(slide.background !== undefined && { background: slide.background }),
     ...(slide.title !== undefined && { title: slide.title }),
     ...(slide.subtitle !== undefined && { subtitle: slide.subtitle }),
     bullets: slide.bullets,

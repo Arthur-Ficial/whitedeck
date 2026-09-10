@@ -236,7 +236,7 @@ export const renderPptx = async (deck: Deck, outPath: string): Promise<void> => 
 
   for (const slide of deck.slides) {
     const target = pptx.addSlide();
-    target.background = { color: WHITE.background.replace('#', '') };
+    target.background = { color: (slide.background ?? WHITE.background).replace('#', '') };
     addSlideContent(target, slide);
   }
   await pptx.writeFile({ fileName: outPath });
