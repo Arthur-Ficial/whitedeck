@@ -1,25 +1,9 @@
 import PptxGenJSImport from 'pptxgenjs';
-import { parseInline } from '../parse/inline.js';
 import { layoutOf, placeholdersByRole, WHITE } from '../theme/white.js';
+import { isCustomLayout } from '../theme/scope.js';
 import { fitted, picFrame } from './geometry.js';
-const LINK_COLOR = '0000EE';
-/** Markdown text to pptx runs: links become blue underlined hyperlinks. */
-const toRuns = (text, paraOptions) => {
-    const segments = parseInline(text);
-    return segments.map((segment, index) => ({
-        text: segment.text,
-        options: {
-            ...paraOptions,
-            breakLine: index === segments.length - 1 ? (paraOptions.breakLine ?? false) : false,
-            ...(segment.url !== undefined && {
-                hyperlink: { url: segment.url },
-                color: LINK_COLOR,
-                underline: { style: 'sng' },
-            }),
-            ...(index > 0 && { bullet: false }),
-        },
-    }));
-};
+import { placeCustomSlide, placeLogo } from './scope-layout.js';
+import { paintPlaced, toRuns } from './scope-pptx.js';
 const PptxGenJS = PptxGenJSImport;
 const EMU_PER_INCH = 914400;
 const inch = (emu) => emu / EMU_PER_INCH;
@@ -85,9 +69,9 @@ const addImages = (target, layout, slide) => {
         const ph = pics[index] ?? pics[0];
         if (!ph)
             return;
-        const rect = fitted(image, picFrame(ph, layout));
+        const rect = fitted(image.path, picFrame(ph, layout));
         target.addImage({
-            path: image,
+            path: image.path,
             x: inch(rect.x),
             y: inch(rect.y),
             w: inch(rect.w),
@@ -119,7 +103,12 @@ const addColumns = (target, ph, slide) => {
         });
     });
 };
-const addSlideContent = (target, slide) => {
+const addSlideContent = (target, slide, meta) => {
+    if (isCustomLayout(slide.layout)) {
+        paintPlaced(target, placeCustomSlide(slide, meta));
+        return;
+    }
+    paintPlaced(target, placeLogo(meta));
     const layout = layoutOf(slide.layout);
     const titlePh = layout.placeholders.find((p) => p.role === 'title');
     if (titlePh && slide.title !== undefined) {
@@ -163,7 +152,7 @@ export const renderPptx = async (deck, outPath) => {
     for (const slide of deck.slides) {
         const target = pptx.addSlide();
         target.background = { color: (slide.background ?? WHITE.background).replace('#', '') };
-        addSlideContent(target, slide);
+        addSlideContent(target, slide, deck.meta);
     }
     await pptx.writeFile({ fileName: outPath });
 };

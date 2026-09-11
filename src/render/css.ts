@@ -1,5 +1,6 @@
 import type { ThemeLayout, ThemePlaceholder } from '../theme/types.js';
 import { LAYOUT_IDS, layoutOf, placeholdersByRole, WHITE } from '../theme/white.js';
+import { customLayoutCss } from './scope-html.js';
 
 /** Apple's body indent step: marL 635000 EMU per level = 66.7px at 96dpi. */
 const INDENT_STEP_PX = 67;
@@ -180,7 +181,7 @@ export const themeCss = (): string => {
     ),
   ];
   const layouts = LAYOUT_IDS.map((id) => layoutRules(id, layoutOf(id)));
-  return [...base, ...layouts, compareRules()].join('\n');
+  return [...base, ...layouts, compareRules(), customLayoutCss()].join('\n');
 };
 
 /** Virtual side-by-side comparison layout on title-bullets geometry. */

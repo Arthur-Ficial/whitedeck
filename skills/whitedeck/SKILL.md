@@ -105,6 +105,57 @@ Source: [GSC Performance](https://search.google.com/search-console/performance)
 
 Layouts: `title` `title-center` `title-top` `title-bullets` `bullets` `title-bullets-photo`
 `photo` `photo-horizontal` `photo-vertical` `photo-3-up` `quote` `blank` `compare`
+plus the left-aligned and annotated-screenshot layouts below.
+
+## Annotated screenshot layouts (scope-*) and left-aligned layouts
+
+For evidence decks - a screenshot per slide with a header telling WHICH page it
+is about, a tool logo, a coloured highlight box and a link to the tool result.
+
+- Front matter `logo: assets/logo.png` paints that image bottom-right on EVERY slide.
+- `Scope: Detail Page ([url](url))` - header line of a scope slide (`SCOPE:` is added, bold).
+- `Tool: assets/psi-logo.jpg` - tool logo, right-aligned in the header.
+- `Caption: [https://pagespeed.web.dev/...](https://pagespeed.web.dev/...)` - small grey line at the bottom.
+- `Footer: f19n / 27.05.2024` - free footer line (title-left).
+- Image attributes live in the alt text: `![border=red](shot.png)`, `![label="JS on" border=red](a.png)`.
+  Border colours: `red` `green` `blue` `black` or `#rrggbb`. Consecutive images with the same
+  label share ONE label bar.
+- Inline runs everywhere: `**bold**` (real bold in pptx and Keynote too), `[green]{#1db100}`
+  colours a run, `[label](url)` links.
+- Notes column (`scope-compare`, `scope-shot-notes`): bullets grouped under bold headings,
+  same syntax as `compare`: `- **IS (not ok)**` then plain bullets, `- **SHOULD**` then bullets.
+
+| layout | content |
+|---|---|
+| `title-left` | `#` title 91pt, `##` link line, `Footer:` line, all left-aligned at the 54pt margin |
+| `section-left` | `#` title 116pt + `##` link line |
+| `title-bullets-left` | Keynote Title & Bullets typography, left-aligned, bold/colour runs |
+| `scope-shot` | header + `#` title + ONE bordered screenshot centred + `Caption:` |
+| `scope-compare` | header + title + 2-3 labelled screenshot columns + notes column |
+| `scope-shot-notes` | header + title + big screenshot (1st) + small side screenshot (2nd) + notes + caption |
+
+```markdown
+<!-- _class: scope-compare -->
+
+Scope: Detail Page ([https://x.example/a](https://x.example/a))
+
+Tool: assets/chrome-logo.png
+
+# "JS turned off" Test
+
+![label="JS on" border=red](shots/js-on.png)
+![label="JS on"](shots/js-on-after.png)
+![label="JS off"](shots/js-off.png)
+
+- **IS (not ok)**
+- cookie banner initially displayed
+- **SHOULD**
+- display cookie banner after minimal user interaction
+```
+
+`whitedeck validate` fails loudly when a scope slide has no `Scope:` line, the wrong image count
+(`scope-shot` 1, `scope-shot-notes` 2) or a `scope-compare` image without `label=`.
+Keynote limits: links in `.key` are plain text (no underline, no hyperlink); notes have no hanging indent.
 
 **Subtitles (`##`) only work where the layout has a body placeholder:** `title`,
 `title-bullets`, `photo-*`. On `title-center` a `##` has nowhere to go and renders as ~4pt

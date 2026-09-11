@@ -1,19 +1,29 @@
 export interface InlineSegment {
   readonly text: string;
   readonly url?: string;
+  readonly bold?: boolean;
+  readonly color?: string;
 }
 
-const LINK = /\[([^\]]+)\]\(([^)]+)\)/g;
+/* One tokeniser for the three inline constructs whitedeck knows:
+   `**bold**`, `[label](url)` and `[text]{#rrggbb}` (a coloured run). Bold may
+   wrap a link or a colour span, so the bold body is parsed recursively. */
+const TOKEN = /\*\*(.+?)\*\*|__(.+?)__|\[([^\]]+)\]\(([^)]+)\)|\[([^\]]+)\]\{(#[0-9a-fA-F]{6})\}/g;
 
-/** Split markdown text into plain and link segments. */
+const withBold = (segments: readonly InlineSegment[]): InlineSegment[] =>
+  segments.map((s) => ({ ...s, bold: true }));
+
+/** Split markdown text into plain, bold, link and coloured segments. */
 export const parseInline = (text: string): InlineSegment[] => {
   const segments: InlineSegment[] = [];
   let last = 0;
-  for (const match of text.matchAll(LINK)) {
+  for (const match of text.matchAll(TOKEN)) {
     if (match.index > last) segments.push({ text: text.slice(last, match.index) });
-    if (match[1] !== undefined && match[2] !== undefined) {
-      segments.push({ text: match[1], url: match[2] });
-    }
+    const [, starBold, underBold, label, url, colored, color] = match;
+    const bold = starBold ?? underBold;
+    if (bold !== undefined) segments.push(...withBold(parseInline(bold)));
+    else if (label !== undefined && url !== undefined) segments.push({ text: label, url });
+    else if (colored !== undefined && color !== undefined) segments.push({ text: colored, color: color.toLowerCase() });
     last = match.index + match[0].length;
   }
   if (last < text.length) segments.push({ text: text.slice(last) });
@@ -23,28 +33,29 @@ export const parseInline = (text: string): InlineSegment[] => {
 const escapeHtml = (value: string): string =>
   value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 
-/** Markdown links to HTML anchors; everything else escaped. */
-export const inlineToHtml = (text: string): string =>
-  parseInline(text)
-    .map((s) => (s.url !== undefined ? `<a href="${escapeHtml(s.url)}">${escapeHtml(s.text)}</a>` : escapeHtml(s.text)))
-    .join('');
+const segmentHtml = (s: InlineSegment): string => {
+  let html = escapeHtml(s.text);
+  if (s.url !== undefined) html = `<a href="${escapeHtml(s.url)}">${html}</a>`;
+  if (s.color !== undefined) html = `<span style="color: ${s.color}">${html}</span>`;
+  if (s.bold === true) html = `<strong>${html}</strong>`;
+  return html;
+};
+
+/** Markdown inline runs to HTML: links, bold, coloured spans; everything else escaped. */
+export const inlineToHtml = (text: string): string => parseInline(text).map(segmentHtml).join('');
 
 /**
- * Strip the emphasis and code markers Keynote cannot render. Without this a
- * bullet reaches the slide as literal "**IS**" or "`/de/p/123`".
+ * Strip the code markers Keynote cannot render. Without this a bullet reaches
+ * the slide as literal "`/de/p/123`".
  */
-const stripEmphasis = (value: string): string =>
-  value
-    .replaceAll(/\*\*(.+?)\*\*/g, '$1')
-    .replaceAll(/__(.+?)__/g, '$1')
-    .replaceAll(/`([^`]+)`/g, '$1');
+const stripCode = (value: string): string => value.replaceAll(/`([^`]+)`/g, '$1');
 
 /**
  * Markdown to plain text for renderers without inline formatting: links
  * become "text (url)", emphasis and code markers are removed.
  */
 export const inlineToPlain = (text: string): string =>
-  stripEmphasis(
+  stripCode(
     parseInline(text)
       .map((s) => {
         if (s.url === undefined) return s.text;
@@ -62,8 +73,41 @@ export const inlineToPlain = (text: string): string =>
  * measure - `inlineToPlain` appends the URL and would over-estimate by far.
  */
 export const inlineVisibleText = (text: string): string =>
-  stripEmphasis(
+  stripCode(
     parseInline(text)
       .map((s) => s.text)
       .join(''),
   );
+
+export interface StyledRun {
+  readonly start: number;
+  readonly end: number;
+  readonly bold: boolean;
+  readonly color?: string;
+  readonly url?: string;
+}
+
+/**
+ * Character ranges (1-based, inclusive - AppleScript's `characters a thru b`)
+ * of every styled run inside `inlineVisibleText(text)`. Plain runs are omitted.
+ */
+export const styledRuns = (text: string): StyledRun[] => {
+  const runs: StyledRun[] = [];
+  let offset = 0;
+  for (const s of parseInline(text)) {
+    const visible = stripCode(s.text);
+    const start = offset + 1;
+    offset += visible.length;
+    if (visible.length === 0) continue;
+    if (s.bold === true || s.color !== undefined || s.url !== undefined) {
+      runs.push({
+        start,
+        end: offset,
+        bold: s.bold === true,
+        ...(s.color !== undefined && { color: s.color }),
+        ...(s.url !== undefined && { url: s.url }),
+      });
+    }
+  }
+  return runs;
+};

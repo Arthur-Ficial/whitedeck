@@ -1,7 +1,10 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { inlineToHtml, inlineVisibleText } from '../parse/inline.js';
+import { isCustomLayout } from '../theme/scope.js';
 import { layoutOf } from '../theme/white.js';
+import { placedToHtml } from './scope-html.js';
+import { placeCustomSlide, placeLogo } from './scope-layout.js';
 /* Keynote shrinks overflowing placeholder text; CSS cannot, so the emitted markdown
    carries a pre-computed size. Helvetica Neue metrics approximated: avg glyph 0.56em,
    line height 1.15em. */
@@ -127,8 +130,15 @@ const marpImageRef = (image) => {
         .replaceAll('(', '%28')
         .replaceAll(')', '%29');
 };
-const slideMarkdown = (slide) => {
-    const lines = [`<!-- _class: ${slide.layout} -->`];
+/* Custom layouts are one raw-HTML block with inline geometry; the logo of a
+   Keynote-geometry slide is the same kind of block. Both are separated from
+   the markdown around them by blank lines (CommonMark raw-HTML block rule). */
+const customBlock = (slide, meta) => [`<!-- _class: ${slide.layout} -->`, '', placedToHtml(placeCustomSlide(slide, meta), marpImageRef), ''];
+const logoBlock = (meta) => meta.logo === undefined ? [] : ['', placedToHtml(placeLogo(meta), marpImageRef), ''];
+const slideMarkdown = (slide, meta) => {
+    if (isCustomLayout(slide.layout))
+        return customBlock(slide, meta).join('\n');
+    const lines = [`<!-- _class: ${slide.layout} -->`, ...logoBlock(meta)];
     /* Marp scopes `<style scoped>` to its own slide, so a per-slide background needs
        no theme change and cannot leak into the next slide. */
     if (slide.background !== undefined) {
@@ -151,7 +161,7 @@ const slideMarkdown = (slide) => {
     if (slide.subtitle !== undefined)
         lines.push(`## ${asMarkdownText(slide.subtitle)}`);
     for (const image of slide.images)
-        lines.push(`![](${marpImageRef(image)})`);
+        lines.push(`![](${marpImageRef(image.path)})`);
     const bodyStyle = bodyStyleTag(slide);
     if (bodyStyle !== undefined)
         lines.push('', bodyStyle, '');
@@ -175,6 +185,6 @@ export const toMarpMarkdown = (deck) => {
         ...(deck.meta.author !== undefined ? [`author: ${JSON.stringify(deck.meta.author)}`] : []),
         '---',
     ];
-    const slides = deck.slides.map((slide) => slideMarkdown(slide));
+    const slides = deck.slides.map((slide) => slideMarkdown(slide, deck.meta));
     return [frontMatter.join('\n'), slides.join('\n\n---\n\n')].join('\n\n') + '\n';
 };

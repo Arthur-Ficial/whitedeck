@@ -26,11 +26,15 @@ export declare const carveExported: (frame: Rect, obstacle: Rect, gap: number) =
  * headline (photo-horizontal pic y -31..921 vs title y 749..907).
  */
 export declare const picFrame: (ph: ThemePlaceholder, layout: ThemeLayout) => Rect;
+export interface ImageSize {
+    readonly w: number;
+    readonly h: number;
+}
 /** PNG intrinsic size from the IHDR chunk; undefined for anything else. */
-export declare const pngSize: (path: string) => {
-    w: number;
-    h: number;
-} | undefined;
+export declare const pngSize: (path: string) => ImageSize | undefined;
+export declare const jpegSize: (path: string) => ImageSize | undefined;
+/** Intrinsic pixel size of a PNG or JPEG; undefined for anything else. */
+export declare const imageSize: (path: string) => ImageSize | undefined;
 /** Scale the image down into the frame, preserving aspect ratio, centred. */
 export declare const fitted: (path: string, frame: Rect) => Rect;
 /**

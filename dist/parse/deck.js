@@ -1,4 +1,5 @@
 import matter from 'gray-matter';
+import { borderColor, isScopeLayout } from '../theme/scope.js';
 import { ALL_LAYOUT_IDS } from '../theme/white.js';
 const CLASS_DIRECTIVE = /<!--\s*_class:\s*([\w-]+)\s*-->/;
 /* A slide may override the theme background - used for context slides that must read
@@ -27,9 +28,42 @@ const decodeEntities = (value) => value.replaceAll(ENTITY, (whole, body) => {
 });
 /** Keynote has no code styling - inline code markers are stripped everywhere for fidelity. */
 const plainText = (value) => decodeEntities(value.replace(INLINE_CODE, '$1')).trim();
-const IMAGE = /!\[[^\]]*\]\(([^)]+)\)/g;
+const IMAGE = /!\[([^\]]*)\]\(([^)]+)\)/g;
+const IMAGE_ATTR = /(\w+)=(?:"([^"]*)"|(\S+))/g;
 const BULLET = /^(\s*)[-*]\s+(.*)$/;
 const ATTRIBUTION = /^(?:--|—)\s*(.*)$/;
+/** `Scope:`, `Tool:`, `Caption:`, `Footer:` - one-line slide fields. */
+const FIELD = /^(Scope|Tool|Caption|Footer):\s*(.*)$/;
+/* Alt text carries image attributes as `key=value` pairs; plain alt text
+   (a description, an empty string) is ignored, as before. */
+const parseImage = (alt, path) => {
+    const image = { path };
+    for (const [, key, quoted, bare] of alt.matchAll(IMAGE_ATTR)) {
+        const value = quoted ?? bare ?? '';
+        if (key === 'border')
+            image.border = borderColor(value);
+        else if (key === 'label')
+            image.label = value;
+        else
+            throw new Error(`Unknown image attribute "${key}" in ![${alt}](${path}). Known: border, label`);
+    }
+    return image;
+};
+const parseField = (line, slide) => {
+    const field = FIELD.exec(line.trimStart());
+    if (field?.[1] === undefined || field[2] === undefined)
+        return false;
+    const value = decodeEntities(field[2]).trim();
+    if (field[1] === 'Scope')
+        slide.scope = value;
+    else if (field[1] === 'Tool')
+        slide.tool = value;
+    else if (field[1] === 'Caption')
+        slide.caption = value;
+    else
+        slide.footer = value;
+    return true;
+};
 const parseLine = (line, slide) => {
     const classMatch = CLASS_DIRECTIVE.exec(line);
     if (classMatch?.[1] !== undefined) {
@@ -41,7 +75,7 @@ const parseLine = (line, slide) => {
         slide.background = backgroundMatch[1];
         return;
     }
-    const images = [...line.matchAll(IMAGE)].flatMap((m) => (m[1] !== undefined ? [m[1]] : []));
+    const images = [...line.matchAll(IMAGE)].flatMap((m) => m[2] !== undefined ? [parseImage(m[1] ?? '', m[2])] : []);
     if (images.length > 0) {
         slide.images.push(...images);
         return;
@@ -67,6 +101,8 @@ const parseLine = (line, slide) => {
         slide.source = decodeEntities(line).trim();
         return;
     }
+    if (parseField(line, slide))
+        return;
     const bullet = BULLET.exec(line);
     if (bullet?.[1] !== undefined && bullet[2] !== undefined) {
         slide.bullets.push({ text: plainText(bullet[2]), level: Math.floor(bullet[1].length / 2) });
@@ -108,11 +144,30 @@ const toColumns = (bullets) => {
     }
     return columns;
 };
+/* Scope layouts fail at parse time, never in front of a client (P8). */
+const checkScope = (layout, slide) => {
+    if (!isScopeLayout(layout))
+        return;
+    if (slide.scope === undefined)
+        throw new Error(`${layout} needs a "Scope:" line`);
+    if (slide.images.length === 0)
+        throw new Error(`${layout} needs at least one image`);
+    if (layout === 'scope-shot' && slide.images.length !== 1)
+        throw new Error('scope-shot takes exactly one image');
+    if (layout === 'scope-shot-notes' && slide.images.length !== 2)
+        throw new Error('scope-shot-notes takes exactly two images (main, side)');
+    if (layout === 'scope-compare' && slide.images.some((i) => i.label === undefined)) {
+        throw new Error('scope-compare: every image needs a label="..." attribute');
+    }
+};
+/** Layouts whose bullets are grouped under bold headings (`- **IS**` then plain bullets). */
+const usesColumns = (layout) => layout === 'compare' || layout === 'scope-compare' || layout === 'scope-shot-notes';
 const finalizeSlide = (slide, isFirst) => {
     const layout = slide.layout ?? inferLayout(slide, isFirst);
     if (!ALL_LAYOUT_IDS.includes(layout)) {
         throw new Error(`Unknown layout "${layout}". Valid layouts: ${ALL_LAYOUT_IDS.join(', ')}`);
     }
+    checkScope(layout, slide);
     const quote = slide.quoteLines.join(' ');
     return {
         layout,
@@ -124,7 +179,11 @@ const finalizeSlide = (slide, isFirst) => {
         ...(quote.length > 0 && { quote }),
         ...(slide.attribution !== undefined && { attribution: slide.attribution }),
         ...(slide.source !== undefined && { source: slide.source }),
-        ...(layout === 'compare' && { columns: toColumns(slide.bullets) }),
+        ...(usesColumns(layout) && { columns: toColumns(slide.bullets) }),
+        ...(slide.scope !== undefined && { scope: slide.scope }),
+        ...(slide.tool !== undefined && { tool: slide.tool }),
+        ...(slide.caption !== undefined && { caption: slide.caption }),
+        ...(slide.footer !== undefined && { footer: slide.footer }),
     };
 };
 export const parseDeck = (markdown) => {
@@ -139,6 +198,7 @@ export const parseDeck = (markdown) => {
     const meta = {
         ...(typeof data['title'] === 'string' && { title: data['title'] }),
         ...(typeof data['author'] === 'string' && { author: data['author'] }),
+        ...(typeof data['logo'] === 'string' && { logo: data['logo'] }),
     };
     return { meta, slides };
 };

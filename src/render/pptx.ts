@@ -1,10 +1,12 @@
 
 import PptxGenJSImport from 'pptxgenjs';
-import type { Deck, DeckSlide } from '../parse/deck.js';
-import { parseInline } from '../parse/inline.js';
+import type { Deck, DeckMeta, DeckSlide } from '../parse/deck.js';
 import type { ThemeLayout, ThemePlaceholder } from '../theme/types.js';
 import { layoutOf, placeholdersByRole, WHITE } from '../theme/white.js';
+import { isCustomLayout } from '../theme/scope.js';
 import { fitted, picFrame } from './geometry.js';
+import { placeCustomSlide, placeLogo } from './scope-layout.js';
+import { paintPlaced, toRuns, type CustomSlide, type Run, type ShapeOptions } from './scope-pptx.js';
 
 /* pptxgenjs ships UMD-style typings that NodeNext ESM cannot resolve, so the
    exact API surface whitedeck uses is typed here and the constructor cast once. */
@@ -22,38 +24,7 @@ interface TextBoxOptions {
   valign?: 'top' | 'middle' | 'bottom';
 }
 
-interface TextItem {
-  text: string;
-  options: {
-    bullet?: { code: string; indent?: number } | boolean;
-    indentLevel?: number;
-    breakLine?: boolean;
-    paraSpaceBefore?: number;
-    hyperlink?: { url: string };
-    color?: string;
-    underline?: { style: 'sng' };
-  };
-}
-
-const LINK_COLOR = '0000EE';
-
-/** Markdown text to pptx runs: links become blue underlined hyperlinks. */
-const toRuns = (text: string, paraOptions: TextItem['options']): TextItem[] => {
-  const segments = parseInline(text);
-  return segments.map((segment, index) => ({
-    text: segment.text,
-    options: {
-      ...paraOptions,
-      breakLine: index === segments.length - 1 ? (paraOptions.breakLine ?? false) : false,
-      ...(segment.url !== undefined && {
-        hyperlink: { url: segment.url },
-        color: LINK_COLOR,
-        underline: { style: 'sng' as const },
-      }),
-      ...(index > 0 && { bullet: false }),
-    },
-  }));
-};
+type TextItem = Run;
 
 interface ImageOptions {
   path: string;
@@ -64,9 +35,10 @@ interface ImageOptions {
   sizing?: { type: 'contain'; w: number; h: number };
 }
 
-interface PptxSlide {
+interface PptxSlide extends CustomSlide {
   addText(text: string | TextItem[], options: TextBoxOptions): void;
   addImage(options: ImageOptions): void;
+  addShape(name: 'rect', options: ShapeOptions): void;
   background: { color: string };
 }
 
@@ -155,9 +127,9 @@ const addImages = (target: PptxSlide, layout: ThemeLayout, slide: DeckSlide): vo
   slide.images.forEach((image, index) => {
     const ph = pics[index] ?? pics[0];
     if (!ph) return;
-    const rect = fitted(image, picFrame(ph, layout));
+    const rect = fitted(image.path, picFrame(ph, layout));
     target.addImage({
-      path: image,
+      path: image.path,
       x: inch(rect.x),
       y: inch(rect.y),
       w: inch(rect.w),
@@ -192,7 +164,12 @@ const addColumns = (target: PptxSlide, ph: ThemePlaceholder, slide: DeckSlide): 
   });
 };
 
-const addSlideContent = (target: PptxSlide, slide: DeckSlide): void => {
+const addSlideContent = (target: PptxSlide, slide: DeckSlide, meta: DeckMeta): void => {
+  if (isCustomLayout(slide.layout)) {
+    paintPlaced(target, placeCustomSlide(slide, meta));
+    return;
+  }
+  paintPlaced(target, placeLogo(meta));
   const layout = layoutOf(slide.layout);
 
   const titlePh = layout.placeholders.find((p) => p.role === 'title');
@@ -237,7 +214,7 @@ export const renderPptx = async (deck: Deck, outPath: string): Promise<void> => 
   for (const slide of deck.slides) {
     const target = pptx.addSlide();
     target.background = { color: (slide.background ?? WHITE.background).replace('#', '') };
-    addSlideContent(target, slide);
+    addSlideContent(target, slide, deck.meta);
   }
   await pptx.writeFile({ fileName: outPath });
 };
