@@ -25,6 +25,8 @@ export interface PlacedImage {
     readonly path: string;
     readonly rect: PtRect;
     readonly border?: string;
+    /** The screenshot links to the test result (caption link) or the page (scope link). */
+    readonly url?: string;
 }
 export interface PlacedRect {
     readonly kind: 'rect';

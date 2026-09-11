@@ -23,7 +23,8 @@ const textHtml = (p: PlacedText): string =>
 
 const imageHtml = (p: PlacedImage, marpSrc: (path: string) => string): string => {
   const outline = p.border === undefined ? '' : `outline:${ptToPx(BORDER_PT)}px solid ${p.border};outline-offset:-${ptToPx(BORDER_PT / 2)}px;`;
-  return `<img class="wd-placed" src="${marpSrc(p.path)}" style="${boxStyle(p.rect)}${outline}">`;
+  const img = `<img class="wd-placed" src="${marpSrc(p.path)}" style="${boxStyle(p.rect)}${outline}">`;
+  return p.url === undefined ? img : `<a href="${p.url.replaceAll('"', '&quot;')}">${img}</a>`;
 };
 
 const rectHtml = (rect: PtRect, fill: string): string =>

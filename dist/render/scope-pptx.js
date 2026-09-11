@@ -69,7 +69,7 @@ const paintNotes = (slide, p) => {
 };
 const paintImage = (slide, p) => {
     const r = p.rect;
-    slide.addImage({ path: p.path, x: inch(r.x), y: inch(r.y), w: inch(r.w), h: inch(r.h) });
+    slide.addImage({ path: p.path, x: inch(r.x), y: inch(r.y), w: inch(r.w), h: inch(r.h), ...(p.url !== undefined && { hyperlink: { url: p.url } }) });
     if (p.border !== undefined) {
         /* The stroke is centred on the picture edge, like the Keynote original. */
         slide.addShape('rect', {
