@@ -25,7 +25,7 @@ import {
   type PtRect,
   type PtText,
 } from '../theme/scope.js';
-import { inlineVisibleText } from '../parse/inline.js';
+import { inlineVisibleText, parseInline } from '../parse/inline.js';
 import { fittedNotesSizePt, fittedSizePt } from './fit.js';
 import { imageSize } from './geometry.js';
 
@@ -57,6 +57,8 @@ export interface PlacedImage {
   readonly path: string;
   readonly rect: PtRect;
   readonly border?: string;
+  /** The screenshot links to the test result (caption link) or the page (scope link). */
+  readonly url?: string;
 }
 export interface PlacedRect {
   readonly kind: 'rect';
@@ -78,11 +80,15 @@ const fitInto = (path: string, frame: PtRect, alignRight = false): PtRect => {
   return { x, y: frame.y + (frame.h - h) / 2, w, h };
 };
 
-const image = (img: DeckImage, frame: PtRect): PlacedImage => ({
+const firstUrl = (text: string | undefined): string | undefined =>
+  text === undefined ? undefined : parseInline(text).find((seg) => seg.url !== undefined)?.url;
+
+const image = (img: DeckImage, frame: PtRect, url?: string): PlacedImage => ({
   kind: 'image',
   path: img.path,
   rect: fitInto(img.path, frame),
   ...(img.border !== undefined && { border: img.border }),
+  ...(url !== undefined && { url }),
 });
 
 const text = (box: PtText, value: string): PlacedText => ({ kind: 'text', box, text: value });
@@ -145,21 +151,22 @@ const notes = (box: PtRect, sizePt: number, columns: readonly DeckColumn[] | und
 const scopeShot = (slide: DeckSlide): Placed[] => {
   const only = slide.images[0];
   if (only === undefined) throw new Error('scope-shot needs one image');
-  return [image(only, SHOT_FRAME)];
+  return [image(only, SHOT_FRAME, firstUrl(slide.caption) ?? firstUrl(slide.scope))];
 };
 
 const scopeCompare = (slide: DeckSlide): Placed[] => [
   ...labelBars(slide.images),
-  ...slide.images.map((img, index) => image(img, compareColumn(index))),
+  ...slide.images.map((img, index) => image(img, compareColumn(index), firstUrl(slide.scope))),
   ...notes(compareNotes(slide.images.length), COMPARE.notesSizePt, slide.columns),
 ];
 
 const scopeShotNotes = (slide: DeckSlide): Placed[] => {
   const [main, side] = slide.images;
   if (main === undefined || side === undefined) throw new Error('scope-shot-notes needs two images');
+  const url = firstUrl(slide.caption) ?? firstUrl(slide.scope);
   return [
-    image(main, SHOT_NOTES.main),
-    image(side, SHOT_NOTES.side),
+    image(main, SHOT_NOTES.main, url),
+    image(side, SHOT_NOTES.side, url),
     ...notes(SHOT_NOTES.notes, SHOT_NOTES.notesSizePt, slide.columns),
   ];
 };

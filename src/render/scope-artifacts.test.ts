@@ -102,13 +102,15 @@ end run
 `;
 
 describe.skipIf(!onMacWithKeynote)('scope layouts: native Keynote', () => {
-  it('builds all slides with logo, bars and borders as images and real text items', async () => {
+  it('imports the pptx so links, bold runs, bars and borders survive as native objects', async () => {
     const outPath = join(outDir, 'scope.key');
     await renderKey(deck, outPath);
     const [count, images, hdr] = (await runAppleScript(COUNT_SCRIPT, [outPath])).split('§');
     expect(count).toBe(String(deck.slides.length));
-    // slide 4: tool logo + rule + border + shot + deck logo = 5; slide 5 (scope-compare): tool + rule + 2 bars + border + 3 shots + logo = 9; slide 6: tool + rule + 2 borders + 2 shots + logo = 7
-    expect((images ?? '').split('|').map(Number)).toEqual([1, 1, 1, 5, 9, 7, 1]);
+    /* Imported from the pptx: bars, borders and the rule are shapes, so only
+       real pictures count - slide 4: tool logo + shot + deck logo, slide 5:
+       tool logo + 3 shots + deck logo, slide 6: tool logo + 2 shots + deck logo. */
+    expect((images ?? '').split('|').map(Number)).toEqual([1, 1, 1, 3, 5, 4, 1]);
     expect(hdr).toContain('SCOPE:');
   });
 });

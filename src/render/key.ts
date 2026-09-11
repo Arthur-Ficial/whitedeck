@@ -1,5 +1,7 @@
 import { execFile } from 'node:child_process';
-import { resolve } from 'node:path';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { Deck, DeckMeta, DeckSlide } from '../parse/deck.js';
 import { inlineToPlain, parseInline } from '../parse/inline.js';
@@ -8,6 +10,7 @@ import { layoutOf } from '../theme/white.js';
 import { bodyFrame, EMU_PER_PT, fitted, imageBandFrame, sourceFrame } from './geometry.js';
 import { placedStatements, runStatements } from './scope-key.js';
 import { placeCustomSlide, placeLogo } from './scope-layout.js';
+import { renderPptx } from './pptx.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -262,12 +265,40 @@ const quitKeynoteIfIdle = async (): Promise<void> => {
   await runAppleScript('tell application "Keynote"\n  if (count of documents) is 0 then quit\nend tell');
 };
 
+/* Keynote's AppleScript dictionary has no hyperlinks, no underline and no
+   shape colours. A deck that needs them (annotated screenshot layouts, a logo,
+   coloured borders) is therefore rendered as the editable pptx first and
+   imported by Keynote itself, which keeps every link blue and underlined, every
+   image link, bold runs, bars and borders as native objects. Plain
+   Keynote-geometry decks keep the master-slide path. */
+const needsImport = (deck: Deck): boolean =>
+  deck.meta.logo !== undefined || deck.slides.some((slide) => isCustomLayout(slide.layout));
+
+const importScript = (pptxPath: string, outPath: string): string =>
+  [
+    'tell application "Keynote"',
+    `  set d to open (POSIX file ${str(pptxPath)})`,
+    `  save d in POSIX file ${str(resolve(outPath))}`,
+    '  close d saving no',
+    'end tell',
+  ].join('\n');
+
+const renderKeyByImport = async (deck: Deck, outPath: string): Promise<void> => {
+  const pptxPath = join(mkdtempSync(join(tmpdir(), 'whitedeck-key-')), 'deck.pptx');
+  await renderPptx(deck, pptxPath);
+  await runAppleScript(importScript(pptxPath, outPath));
+};
+
 export const renderKey = async (deck: Deck, outPath: string): Promise<void> => {
   if (process.platform !== 'darwin') {
     throw new Error('Native .key output requires macOS with Keynote.app installed');
   }
   const wasRunning = await keynoteIsRunning();
   try {
+    if (needsImport(deck)) {
+      await renderKeyByImport(deck, outPath);
+      return;
+    }
     const imagesPerSlide: PlacedImage[][] = deck.slides.map((slide) => placeImages(slide));
     await runAppleScript(buildScript(deck, imagesPerSlide, outPath));
   } finally {

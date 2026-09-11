@@ -155,7 +155,9 @@ Tool: assets/chrome-logo.png
 
 `whitedeck validate` fails loudly when a scope slide has no `Scope:` line, the wrong image count
 (`scope-shot` 1, `scope-shot-notes` 2) or a `scope-compare` image without `label=`.
-Keynote limits: links in `.key` are plain text (no underline, no hyperlink); notes have no hanging indent.
+Screenshots link to the caption URL (or the scope URL) in every format. A deck using these layouts
+or a `logo:` reaches `.key` through Keynote's own PowerPoint import, so links stay blue and
+underlined and bars/borders are native shapes (plain Keynote-layout decks keep the master-slide path).
 
 **Subtitles (`##`) only work where the layout has a body placeholder:** `title`,
 `title-bullets`, `photo-*`. On `title-center` a `##` has nowhere to go and renders as ~4pt

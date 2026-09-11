@@ -1,5 +1,5 @@
 import { BLACK, CAPTION, COMPARE, HEADER_RULE, LABEL_BLUE, LABEL_TEXT, LOGO, NOTES, SCOPE_LABEL, SCOPE_TEXT, SCOPE_TITLE, SECTION_LEFT, SHOT_FRAME, SHOT_NOTES, TITLE_BULLETS_LEFT, TITLE_LEFT, TOOL_LOGO, compareColumn, compareLabelBar, compareNotes, isCustomLayout, isScopeLayout, } from '../theme/scope.js';
-import { inlineVisibleText } from '../parse/inline.js';
+import { inlineVisibleText, parseInline } from '../parse/inline.js';
 import { fittedNotesSizePt, fittedSizePt } from './fit.js';
 import { imageSize } from './geometry.js';
 /** Contain-fit an image into a frame; a right-aligned fit keeps the right edge. */
@@ -14,11 +14,13 @@ const fitInto = (path, frame, alignRight = false) => {
     const x = alignRight ? frame.x + frame.w - w : frame.x + (frame.w - w) / 2;
     return { x, y: frame.y + (frame.h - h) / 2, w, h };
 };
-const image = (img, frame) => ({
+const firstUrl = (text) => text === undefined ? undefined : parseInline(text).find((seg) => seg.url !== undefined)?.url;
+const image = (img, frame, url) => ({
     kind: 'image',
     path: img.path,
     rect: fitInto(img.path, frame),
     ...(img.border !== undefined && { border: img.border }),
+    ...(url !== undefined && { url }),
 });
 const text = (box, value) => ({ kind: 'text', box, text: value });
 /* Headlines shrink like Keynote placeholders do; the same size then reaches
@@ -65,20 +67,21 @@ const scopeShot = (slide) => {
     const only = slide.images[0];
     if (only === undefined)
         throw new Error('scope-shot needs one image');
-    return [image(only, SHOT_FRAME)];
+    return [image(only, SHOT_FRAME, firstUrl(slide.caption) ?? firstUrl(slide.scope))];
 };
 const scopeCompare = (slide) => [
     ...labelBars(slide.images),
-    ...slide.images.map((img, index) => image(img, compareColumn(index))),
+    ...slide.images.map((img, index) => image(img, compareColumn(index), firstUrl(slide.scope))),
     ...notes(compareNotes(slide.images.length), COMPARE.notesSizePt, slide.columns),
 ];
 const scopeShotNotes = (slide) => {
     const [main, side] = slide.images;
     if (main === undefined || side === undefined)
         throw new Error('scope-shot-notes needs two images');
+    const url = firstUrl(slide.caption) ?? firstUrl(slide.scope);
     return [
-        image(main, SHOT_NOTES.main),
-        image(side, SHOT_NOTES.side),
+        image(main, SHOT_NOTES.main, url),
+        image(side, SHOT_NOTES.side, url),
         ...notes(SHOT_NOTES.notes, SHOT_NOTES.notesSizePt, slide.columns),
     ];
 };

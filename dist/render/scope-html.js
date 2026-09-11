@@ -14,7 +14,8 @@ const textStyle = (t) => `${boxStyle(t)}font-size:${t.sizePt}pt;font-weight:${FO
 const textHtml = (p) => `<div class="wd-text" style="${textStyle(p.box)}"><span>${inlineToHtml(p.text)}</span></div>`;
 const imageHtml = (p, marpSrc) => {
     const outline = p.border === undefined ? '' : `outline:${ptToPx(BORDER_PT)}px solid ${p.border};outline-offset:-${ptToPx(BORDER_PT / 2)}px;`;
-    return `<img class="wd-placed" src="${marpSrc(p.path)}" style="${boxStyle(p.rect)}${outline}">`;
+    const img = `<img class="wd-placed" src="${marpSrc(p.path)}" style="${boxStyle(p.rect)}${outline}">`;
+    return p.url === undefined ? img : `<a href="${p.url.replaceAll('"', '&quot;')}">${img}</a>`;
 };
 const rectHtml = (rect, fill) => `<div class="wd-rect" style="${boxStyle(rect)}background:${fill};"></div>`;
 const listHtml = (items, { indentPx, gapPt, pct, flush }) => {

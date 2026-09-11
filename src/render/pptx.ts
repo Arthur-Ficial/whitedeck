@@ -32,6 +32,7 @@ interface ImageOptions {
   y: number;
   w: number;
   h: number;
+  hyperlink?: { url: string };
   sizing?: { type: 'contain'; w: number; h: number };
 }
 

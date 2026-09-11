@@ -43,7 +43,7 @@ export interface ShapeOptions {
 }
 export interface CustomSlide {
   addText(text: Run[], options: BoxOptions): void;
-  addImage(options: { path: string; x: number; y: number; w: number; h: number }): void;
+  addImage(options: { path: string; x: number; y: number; w: number; h: number; hyperlink?: { url: string } }): void;
   addShape(name: 'rect', options: ShapeOptions): void;
 }
 
@@ -127,7 +127,7 @@ const paintNotes = (slide: CustomSlide, p: PlacedNotes): void => {
 
 const paintImage = (slide: CustomSlide, p: PlacedImage): void => {
   const r = p.rect;
-  slide.addImage({ path: p.path, x: inch(r.x), y: inch(r.y), w: inch(r.w), h: inch(r.h) });
+  slide.addImage({ path: p.path, x: inch(r.x), y: inch(r.y), w: inch(r.w), h: inch(r.h), ...(p.url !== undefined && { hyperlink: { url: p.url } }) });
   if (p.border !== undefined) {
     /* The stroke is centred on the picture edge, like the Keynote original. */
     slide.addShape('rect', {

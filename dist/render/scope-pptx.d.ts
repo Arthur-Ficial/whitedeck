@@ -59,6 +59,9 @@ export interface CustomSlide {
         y: number;
         w: number;
         h: number;
+        hyperlink?: {
+            url: string;
+        };
     }): void;
     addShape(name: 'rect', options: ShapeOptions): void;
 }
