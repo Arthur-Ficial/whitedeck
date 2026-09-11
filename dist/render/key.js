@@ -1,9 +1,12 @@
 import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { inlineToPlain } from '../parse/inline.js';
+import { inlineToPlain, parseInline } from '../parse/inline.js';
+import { isCustomLayout } from '../theme/scope.js';
 import { layoutOf } from '../theme/white.js';
 import { bodyFrame, EMU_PER_PT, fitted, imageBandFrame, sourceFrame } from './geometry.js';
+import { placedStatements, runStatements } from './scope-key.js';
+import { placeCustomSlide, placeLogo } from './scope-layout.js';
 const execFileAsync = promisify(execFile);
 /** Candidate Keynote master-slide names per whitedeck layout id (naming varies by Keynote version/locale). */
 const MASTER_CANDIDATES = {
@@ -20,6 +23,12 @@ const MASTER_CANDIDATES = {
     'quote': ['Quote'],
     'blank': ['Blank'],
     'compare': ['Title & Bullets'],
+    'title-left': ['Blank'],
+    'section-left': ['Blank'],
+    'title-bullets-left': ['Title & Bullets'],
+    'scope-shot': ['Blank'],
+    'scope-compare': ['Blank'],
+    'scope-shot-notes': ['Blank'],
 };
 /**
  * Layouts whose Keynote master carries a photo placeholder. That placeholder
@@ -70,9 +79,9 @@ const placeImages = (slide) => {
     const pt = (emu) => Math.round(emu / EMU_PER_PT);
     const frame = imageBandFrame(layout, slide.source !== undefined);
     return slide.images.map((image) => {
-        const rect = fitted(resolve(image), frame);
+        const rect = fitted(resolve(image.path), frame);
         return {
-            path: resolve(image),
+            path: resolve(image.path),
             xPt: pt(rect.x),
             yPt: pt(rect.y),
             wPt: pt(rect.w),
@@ -89,7 +98,48 @@ const imageStatements = (images) => images.flatMap((image) => [
     `set height of img to ${image.hPt}`,
     `set position of img to {${image.xPt}, ${image.yPt}}`,
 ]);
-const slideStatements = (slide, images) => {
+/* Bold and coloured runs on the master placeholders. A line carrying a link
+   is left alone: its placed text has " (url)" appended, which shifts every
+   later character index. */
+const hasLink = (text) => parseInline(text).some((s) => s.url !== undefined);
+const bodyRunStatements = (slide) => {
+    const item = 'default body item of s';
+    const statements = [];
+    let base = 0;
+    const lines = [];
+    if (slide.columns !== undefined && slide.columns.length > 0) {
+        for (const col of slide.columns) {
+            lines.push({ raw: col.header, placed: inlineToPlain(col.header), offset: 0, bold: true });
+            for (const b of col.bullets)
+                lines.push({ raw: b.text, placed: `\t${inlineToPlain(b.text)}`, offset: 1, bold: false });
+        }
+    }
+    else if (slide.quote === undefined) {
+        for (const b of slide.bullets) {
+            lines.push({ raw: b.text, placed: '\t'.repeat(b.level) + inlineToPlain(b.text), offset: b.level, bold: false });
+        }
+    }
+    for (const line of lines) {
+        if (line.bold && line.placed.length > 0) {
+            statements.push(`set font of characters ${base + 1} thru ${base + line.placed.length} of object text of ${item} to "HelveticaNeue-Bold"`);
+        }
+        if (!hasLink(line.raw))
+            statements.push(...runStatements(item, line.raw, base + line.offset));
+        base += line.placed.length + 1;
+    }
+    return statements;
+};
+const customSlideStatements = (slide, meta) => [
+    `set m to my pickMaster(d, ${list(MASTER_CANDIDATES[slide.layout] ?? ['Blank'])})`,
+    'set s to make new slide at d with properties {base slide:m}',
+    'my clearMasterText(s)',
+    'set title showing of s to false',
+    ...(slide.layout === 'title-bullets-left' ? [] : ['set body showing of s to false']),
+    ...placedStatements(placeCustomSlide(slide, meta)),
+];
+const slideStatements = (slide, images, meta) => {
+    if (isCustomLayout(slide.layout))
+        return customSlideStatements(slide, meta);
     const body = bodyText(slide);
     const layoutId = keyLayoutId(slide);
     const layout = layoutOf(layoutId);
@@ -108,6 +158,7 @@ const slideStatements = (slide, images) => {
             ? [
                 'set title showing of s to true',
                 `set object text of default title item of s to ${str(inlineToPlain(slide.title))}`,
+                ...(hasLink(slide.title) ? [] : runStatements('default title item of s', slide.title, 0)),
             ]
             : ['set title showing of s to false']),
         ...(body !== undefined
@@ -119,6 +170,7 @@ const slideStatements = (slide, images) => {
                 `set width of default body item of s to ${pt(bodyFrame(layout, slide.source !== undefined).w)}`,
                 `set height of default body item of s to ${pt(bodyFrame(layout, slide.source !== undefined).h)}`,
                 `set position of default body item of s to {${pt(bodyFrame(layout, slide.source !== undefined).x)}, ${pt(bodyFrame(layout, slide.source !== undefined).y)}}`,
+                ...bodyRunStatements(slide),
             ]
             : ['set body showing of s to false']),
         ...imageStatements(images),
@@ -133,6 +185,7 @@ const slideStatements = (slide, images) => {
                 'set size of object text of srcItem to 18',
             ]
             : []),
+        ...placedStatements(placeLogo(meta)),
     ];
 };
 const buildScript = (deck, imagesPerSlide, outPath) => [
@@ -158,7 +211,7 @@ const buildScript = (deck, imagesPerSlide, outPath) => [
     '',
     'tell application "Keynote"',
     '  set d to make new document with properties {document theme:theme "White", width:1920, height:1080}',
-    ...deck.slides.flatMap((slide, i) => slideStatements(slide, imagesPerSlide[i] ?? []).map((line) => `  ${line}`)),
+    ...deck.slides.flatMap((slide, i) => slideStatements(slide, imagesPerSlide[i] ?? [], deck.meta).map((line) => `  ${line}`)),
     '  delete slide 1 of d',
     `  save d in POSIX file ${str(resolve(outPath))}`,
     '  close d saving no',

@@ -81,9 +81,36 @@ export const pngSize = (path) => {
         return undefined;
     return { w: head.readUInt32BE(16), h: head.readUInt32BE(20) };
 };
+/* JPEG: walk the marker segments to the first SOF (C0..CF except C4/C8/CC),
+   which carries height then width. Screenshots and logos are often JPEGs;
+   without this they "fit" the whole frame and get stretched (TICKETS T9). */
+const isSof = (marker) => marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+export const jpegSize = (path) => {
+    let data;
+    try {
+        data = readFileSync(path);
+    }
+    catch {
+        return undefined;
+    }
+    if (data.length < 4 || data.readUInt16BE(0) !== 0xffd8)
+        return undefined;
+    let offset = 2;
+    while (offset + 9 < data.length) {
+        if (data[offset] !== 0xff)
+            return undefined;
+        const marker = data[offset + 1] ?? 0;
+        if (isSof(marker))
+            return { h: data.readUInt16BE(offset + 5), w: data.readUInt16BE(offset + 7) };
+        offset += 2 + data.readUInt16BE(offset + 2);
+    }
+    return undefined;
+};
+/** Intrinsic pixel size of a PNG or JPEG; undefined for anything else. */
+export const imageSize = (path) => pngSize(path) ?? jpegSize(path);
 /** Scale the image down into the frame, preserving aspect ratio, centred. */
 export const fitted = (path, frame) => {
-    const size = pngSize(path);
+    const size = imageSize(path);
     if (size === undefined || size.w === 0 || size.h === 0)
         return frame;
     const scale = Math.min(frame.w / size.w, frame.h / size.h);

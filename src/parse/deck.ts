@@ -1,4 +1,5 @@
 import matter from 'gray-matter';
+import { borderColor, isScopeLayout } from '../theme/scope.js';
 import { ALL_LAYOUT_IDS } from '../theme/white.js';
 
 export interface DeckBullet {
@@ -11,6 +12,15 @@ export interface DeckColumn {
   readonly bullets: readonly DeckBullet[];
 }
 
+/** An image with the attributes carried in its alt text: `![border=red label="JS on"](x.png)`. */
+export interface DeckImage {
+  readonly path: string;
+  /** Border colour as `#rrggbb`; absent = no border. */
+  readonly border?: string;
+  /** Label bar text above the image (scope-compare). */
+  readonly label?: string;
+}
+
 export interface DeckSlide {
   readonly layout: string;
   /** Per-slide background colour from `<!-- _background: #RRGGBB -->`. White when absent. */
@@ -18,16 +28,26 @@ export interface DeckSlide {
   readonly title?: string;
   readonly subtitle?: string;
   readonly bullets: readonly DeckBullet[];
-  readonly images: readonly string[];
+  readonly images: readonly DeckImage[];
   readonly quote?: string;
   readonly attribution?: string;
   readonly source?: string;
   readonly columns?: readonly DeckColumn[];
+  /** `Scope:` header text of a scope layout (inline markdown allowed). */
+  readonly scope?: string;
+  /** `Tool:` logo image path shown top-right of a scope layout. */
+  readonly tool?: string;
+  /** `Caption:` small grey line at the bottom (inline markdown allowed). */
+  readonly caption?: string;
+  /** `Footer:` free text line at the bottom-left (title-left). */
+  readonly footer?: string;
 }
 
 export interface DeckMeta {
   readonly title?: string;
   readonly author?: string;
+  /** Image painted bottom-right on every slide. */
+  readonly logo?: string;
 }
 
 export interface Deck {
@@ -65,9 +85,25 @@ const decodeEntities = (value: string): string =>
 
 /** Keynote has no code styling - inline code markers are stripped everywhere for fidelity. */
 const plainText = (value: string): string => decodeEntities(value.replace(INLINE_CODE, '$1')).trim();
-const IMAGE = /!\[[^\]]*\]\(([^)]+)\)/g;
+const IMAGE = /!\[([^\]]*)\]\(([^)]+)\)/g;
+const IMAGE_ATTR = /(\w+)=(?:"([^"]*)"|(\S+))/g;
 const BULLET = /^(\s*)[-*]\s+(.*)$/;
 const ATTRIBUTION = /^(?:--|—)\s*(.*)$/;
+/** `Scope:`, `Tool:`, `Caption:`, `Footer:` - one-line slide fields. */
+const FIELD = /^(Scope|Tool|Caption|Footer):\s*(.*)$/;
+
+/* Alt text carries image attributes as `key=value` pairs; plain alt text
+   (a description, an empty string) is ignored, as before. */
+const parseImage = (alt: string, path: string): DeckImage => {
+  const image: { path: string; border?: string; label?: string } = { path };
+  for (const [, key, quoted, bare] of alt.matchAll(IMAGE_ATTR)) {
+    const value = quoted ?? bare ?? '';
+    if (key === 'border') image.border = borderColor(value);
+    else if (key === 'label') image.label = value;
+    else throw new Error(`Unknown image attribute "${key}" in ![${alt}](${path}). Known: border, label`);
+  }
+  return image;
+};
 
 interface MutableSlide {
   layout?: string;
@@ -75,11 +111,26 @@ interface MutableSlide {
   title?: string;
   subtitle?: string;
   bullets: DeckBullet[];
-  images: string[];
+  images: DeckImage[];
   quoteLines: string[];
   attribution?: string;
   source?: string;
+  scope?: string;
+  tool?: string;
+  caption?: string;
+  footer?: string;
 }
+
+const parseField = (line: string, slide: MutableSlide): boolean => {
+  const field = FIELD.exec(line.trimStart());
+  if (field?.[1] === undefined || field[2] === undefined) return false;
+  const value = decodeEntities(field[2]).trim();
+  if (field[1] === 'Scope') slide.scope = value;
+  else if (field[1] === 'Tool') slide.tool = value;
+  else if (field[1] === 'Caption') slide.caption = value;
+  else slide.footer = value;
+  return true;
+};
 
 const parseLine = (line: string, slide: MutableSlide): void => {
   const classMatch = CLASS_DIRECTIVE.exec(line);
@@ -92,7 +143,9 @@ const parseLine = (line: string, slide: MutableSlide): void => {
     slide.background = backgroundMatch[1];
     return;
   }
-  const images = [...line.matchAll(IMAGE)].flatMap((m) => (m[1] !== undefined ? [m[1]] : []));
+  const images = [...line.matchAll(IMAGE)].flatMap((m) =>
+    m[2] !== undefined ? [parseImage(m[1] ?? '', m[2])] : [],
+  );
   if (images.length > 0) {
     slide.images.push(...images);
     return;
@@ -116,6 +169,7 @@ const parseLine = (line: string, slide: MutableSlide): void => {
     slide.source = decodeEntities(line).trim();
     return;
   }
+  if (parseField(line, slide)) return;
   const bullet = BULLET.exec(line);
   if (bullet?.[1] !== undefined && bullet[2] !== undefined) {
     slide.bullets.push({ text: plainText(bullet[2]), level: Math.floor(bullet[1].length / 2) });
@@ -156,11 +210,28 @@ const toColumns = (bullets: readonly DeckBullet[]): DeckColumn[] => {
   return columns;
 };
 
+/* Scope layouts fail at parse time, never in front of a client (P8). */
+const checkScope = (layout: string, slide: MutableSlide): void => {
+  if (!isScopeLayout(layout)) return;
+  if (slide.scope === undefined) throw new Error(`${layout} needs a "Scope:" line`);
+  if (slide.images.length === 0) throw new Error(`${layout} needs at least one image`);
+  if (layout === 'scope-shot' && slide.images.length !== 1) throw new Error('scope-shot takes exactly one image');
+  if (layout === 'scope-shot-notes' && slide.images.length !== 2) throw new Error('scope-shot-notes takes exactly two images (main, side)');
+  if (layout === 'scope-compare' && slide.images.some((i) => i.label === undefined)) {
+    throw new Error('scope-compare: every image needs a label="..." attribute');
+  }
+};
+
+/** Layouts whose bullets are grouped under bold headings (`- **IS**` then plain bullets). */
+const usesColumns = (layout: string): boolean =>
+  layout === 'compare' || layout === 'scope-compare' || layout === 'scope-shot-notes';
+
 const finalizeSlide = (slide: MutableSlide, isFirst: boolean): DeckSlide => {
   const layout = slide.layout ?? inferLayout(slide, isFirst);
   if (!ALL_LAYOUT_IDS.includes(layout)) {
     throw new Error(`Unknown layout "${layout}". Valid layouts: ${ALL_LAYOUT_IDS.join(', ')}`);
   }
+  checkScope(layout, slide);
   const quote = slide.quoteLines.join(' ');
   return {
     layout,
@@ -172,7 +243,11 @@ const finalizeSlide = (slide: MutableSlide, isFirst: boolean): DeckSlide => {
     ...(quote.length > 0 && { quote }),
     ...(slide.attribution !== undefined && { attribution: slide.attribution }),
     ...(slide.source !== undefined && { source: slide.source }),
-    ...(layout === 'compare' && { columns: toColumns(slide.bullets) }),
+    ...(usesColumns(layout) && { columns: toColumns(slide.bullets) }),
+    ...(slide.scope !== undefined && { scope: slide.scope }),
+    ...(slide.tool !== undefined && { tool: slide.tool }),
+    ...(slide.caption !== undefined && { caption: slide.caption }),
+    ...(slide.footer !== undefined && { footer: slide.footer }),
   };
 };
 
@@ -189,6 +264,7 @@ export const parseDeck = (markdown: string): Deck => {
   const meta: DeckMeta = {
     ...(typeof data['title'] === 'string' && { title: data['title'] }),
     ...(typeof data['author'] === 'string' && { author: data['author'] }),
+    ...(typeof data['logo'] === 'string' && { logo: data['logo'] }),
   };
   return { meta, slides };
 };

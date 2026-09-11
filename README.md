@@ -85,7 +85,14 @@ title            title-center     title-top        title-bullets
 bullets          title-bullets-photo               photo
 photo-horizontal photo-vertical   photo-3-up       quote            blank
 compare          (virtual: side-by-side bullet columns on Keynote geometry)
+title-left       section-left     title-bullets-left   (left-aligned at a 54pt margin)
+scope-shot       scope-compare    scope-shot-notes     (annotated screenshot slides)
 ```
+
+Annotated screenshot slides carry a `Scope:` header line, a `Tool:` logo, bordered
+screenshots (`![border=red label="JS on"](shot.png)`), a notes column and a `Caption:` link;
+`logo: x.png` in the front matter paints a logo on every slide; `**bold**` and `[x]{#1db100}`
+colour runs survive into PPTX and Keynote. See `examples/scope-demo.md` and the skill.
 
 ## CLI
 

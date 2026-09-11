@@ -88,7 +88,7 @@ describe('parseDeck', () => {
       quote: '"Stay hungry, stay foolish."',
       attribution: 'Steve Jobs',
     });
-    expect(deck.slides[2]?.images).toEqual(['beach.jpg']);
+    expect(deck.slides[2]?.images).toEqual([{ path: 'beach.jpg' }]);
   });
 
   it('parses an empty slide as blank layout', () => {

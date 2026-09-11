@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { copyFileSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { OUTPUT_FORMATS, renderFormat, resolveFormats } from './formats.js';
@@ -41,6 +41,9 @@ const build = async (args) => {
     try {
         const deck = parseDeck(markdown);
         const outDir = resolve(previousCwd, values.out ?? dir);
+        /* Keynote cannot save into a missing folder - it shows a modal error sheet
+           and every later AppleEvent times out. Create the folder up front. */
+        mkdirSync(outDir, { recursive: true });
         for (const format of resolveFormats(values.format ?? 'html')) {
             const outPath = join(outDir, `${name}.${format}`);
             await renderFormat(format, deck, outPath);
