@@ -26,7 +26,7 @@ import {
   type PtText,
 } from '../theme/scope.js';
 import { inlineVisibleText } from '../parse/inline.js';
-import { fittedSizePt } from './fit.js';
+import { fittedNotesSizePt, fittedSizePt } from './fit.js';
 import { imageSize } from './geometry.js';
 
 /* Everything a custom layout paints, in points, in paint order. The three
@@ -132,8 +132,15 @@ const labelBars = (images: readonly DeckImage[]): Placed[] => {
   return placed;
 };
 
-const notes = (box: PtRect, sizePt: number, columns: readonly DeckColumn[] | undefined): Placed[] =>
-  columns === undefined || columns.length === 0 ? [] : [{ kind: 'notes', box, sizePt, columns }];
+/* A long IS / SHOULD block shrinks like a Keynote body placeholder would;
+   the gap between paragraphs shrinks with it (see NOTES.spaceBeforePt). */
+const MIN_NOTES_PT = 20;
+const notes = (box: PtRect, sizePt: number, columns: readonly DeckColumn[] | undefined): Placed[] => {
+  if (columns === undefined || columns.length === 0) return [];
+  const groups = columns.map((c) => ({ header: inlineVisibleText(c.header), lines: c.bullets.map((b) => inlineVisibleText(b.text)) }));
+  const fit = fittedNotesSizePt(groups, { widthPt: box.w, heightPt: box.h, sizePt, minPt: MIN_NOTES_PT }, NOTES.spaceBeforePt);
+  return [{ kind: 'notes', box, sizePt: fit, columns }];
+};
 
 const scopeShot = (slide: DeckSlide): Placed[] => {
   const only = slide.images[0];

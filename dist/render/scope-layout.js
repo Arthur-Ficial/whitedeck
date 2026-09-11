@@ -1,6 +1,6 @@
 import { BLACK, CAPTION, COMPARE, HEADER_RULE, LABEL_BLUE, LABEL_TEXT, LOGO, NOTES, SCOPE_LABEL, SCOPE_TEXT, SCOPE_TITLE, SECTION_LEFT, SHOT_FRAME, SHOT_NOTES, TITLE_BULLETS_LEFT, TITLE_LEFT, TOOL_LOGO, compareColumn, compareLabelBar, compareNotes, isCustomLayout, isScopeLayout, } from '../theme/scope.js';
 import { inlineVisibleText } from '../parse/inline.js';
-import { fittedSizePt } from './fit.js';
+import { fittedNotesSizePt, fittedSizePt } from './fit.js';
 import { imageSize } from './geometry.js';
 /** Contain-fit an image into a frame; a right-aligned fit keeps the right edge. */
 const fitInto = (path, frame, alignRight = false) => {
@@ -51,7 +51,16 @@ const labelBars = (images) => {
     });
     return placed;
 };
-const notes = (box, sizePt, columns) => columns === undefined || columns.length === 0 ? [] : [{ kind: 'notes', box, sizePt, columns }];
+/* A long IS / SHOULD block shrinks like a Keynote body placeholder would;
+   the gap between paragraphs shrinks with it (see NOTES.spaceBeforePt). */
+const MIN_NOTES_PT = 20;
+const notes = (box, sizePt, columns) => {
+    if (columns === undefined || columns.length === 0)
+        return [];
+    const groups = columns.map((c) => ({ header: inlineVisibleText(c.header), lines: c.bullets.map((b) => inlineVisibleText(b.text)) }));
+    const fit = fittedNotesSizePt(groups, { widthPt: box.w, heightPt: box.h, sizePt, minPt: MIN_NOTES_PT }, NOTES.spaceBeforePt);
+    return [{ kind: 'notes', box, sizePt: fit, columns }];
+};
 const scopeShot = (slide) => {
     const only = slide.images[0];
     if (only === undefined)
