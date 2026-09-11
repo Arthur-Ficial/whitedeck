@@ -22,10 +22,15 @@ export const notesHeightPt = (groups, widthPt, sizePt, gapPt) => {
     }
     return height + Math.max(paragraphs - 1, 0) * gapPt;
 };
-/** Largest size (stepping down by 2pt) at which the notes block fits `heightPt`, never below `minPt`. */
+/** The paragraph gap shrinks in proportion to the text, as Keynote's autoshrink scales paragraph spacing. */
+export const scaledGapPt = (gapPt, sizePt, basePt) => (gapPt * sizePt) / basePt;
+/**
+ * Largest size (stepping down by 2pt) at which the notes block fits `heightPt`,
+ * never below `minPt`; `gapPt` is the paragraph gap at `box.sizePt` and scales down with the text.
+ */
 export const fittedNotesSizePt = (groups, box, gapPt) => {
     for (let size = box.sizePt; size > box.minPt; size -= 2) {
-        if (notesHeightPt(groups, box.widthPt, size, gapPt) <= box.heightPt)
+        if (notesHeightPt(groups, box.widthPt, size, scaledGapPt(gapPt, size, box.sizePt)) <= box.heightPt)
             return size;
     }
     return box.minPt;

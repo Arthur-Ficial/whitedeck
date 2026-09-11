@@ -114,6 +114,41 @@ describe('placeCustomSlide geometry (points, measured on the reference deck)', (
     expect(title.box.sizePt).toBeLessThan(112);
     expect(title.box.sizePt).toBeGreaterThanOrEqual(60);
   });
+
+  const shotNotesMd = (lines: readonly string[]): string =>
+    [
+      '<!-- _class: scope-shot-notes -->',
+      '',
+      'Scope: x',
+      '',
+      '# GSC Inspect URL',
+      '',
+      '![border=red](examples/scope/gsc.png)',
+      '![border=green](examples/scope/gsc-resources.png)',
+      '',
+      '- **IS (not ok)**',
+      ...lines.map((l) => `- ${l}`),
+      '- **SHOULD**',
+      '- fix it',
+    ].join('\n');
+  const LONG_LINE = 'partner badge (Intrepid) not rendered: image on legacy.asi-reisen.de blocked by robots.txt';
+
+  it('shrinks a long notes block to fit, and refuses one that does not fit even at 20pt', () => {
+    const fits = parseDeck(shotNotesMd([LONG_LINE]));
+    const notes = placeCustomSlide(fits.slides[0]!, fits.meta).find((p) => p.kind === 'notes');
+    if (notes?.kind !== 'notes') throw new Error('no notes');
+    expect(notes.sizePt).toBeLessThan(34.4);
+    expect(notes.sizePt).toBeGreaterThanOrEqual(20);
+    /* the paragraph gap shrinks with the text: 30pt at 34.4pt */
+    expect(notes.gapPt).toBeCloseTo((30 * notes.sizePt) / 34.4, 5);
+    const short = parseDeck(shotNotesMd(['ok']));
+    const full = placeCustomSlide(short.slides[0]!, short.meta).find((p) => p.kind === 'notes');
+    expect(full?.kind === 'notes' && full.sizePt).toBe(34.4);
+    expect(full?.kind === 'notes' && full.gapPt).toBe(30);
+
+    const overflows = parseDeck(shotNotesMd([LONG_LINE, LONG_LINE, LONG_LINE, LONG_LINE]));
+    expect(() => placeCustomSlide(overflows.slides[0]!, overflows.meta)).toThrow(/slide "GSC Inspect URL": notes block does not fit .* even at 20pt/);
+  });
 });
 
 describe('image sizes and solid PNGs', () => {

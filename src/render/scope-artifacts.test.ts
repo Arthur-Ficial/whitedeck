@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import JSZip from 'jszip';
-import { PDFDocument } from 'pdf-lib';
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { parseDeck } from '../parse/deck.js';
 import { renderHtml } from './html.js';
@@ -42,6 +42,9 @@ describe('scope layouts: HTML/PDF through the real Marp', () => {
     expect(html).toContain('<strong>SCOPE:</strong>');
     expect(html).toContain('<span style="color: #1db100">green</span>');
     expect(html).toMatch(/<h3[^>]*>IS \(not ok\)<\/h3>/);
+    /* Links are blue and underlined; linked screenshots are anchors with the image geometry. */
+    expect(html).toMatch(/\.wd-text a\s*\{\s*color:\s*#0000EE;\s*text-decoration:\s*underline;?\s*\}/);
+    expect(html).toMatch(/<a class="wd-image-link" href="https:[^"]+" style="position:absolute;left:\d+px;top:\d+px;width:\d+px;height:\d+px;">/);
     /* Marp's own runtime script contains `**2`; only the slides are checked. */
     const slidesOnly = html.replaceAll(/<script[\s\S]*?<\/script>/g, '').split('<section').slice(1).join('');
     expect(slidesOnly).not.toContain('![');
@@ -55,6 +58,28 @@ describe('scope layouts: HTML/PDF through the real Marp', () => {
     expect(pdf.getPageCount()).toBe(deck.slides.length);
     const raw = readFileSync(outPath, 'latin1');
     expect(raw.match(/\/Subtype\s*\/Image/g)?.length ?? 0).toBeGreaterThanOrEqual(8);
+  });
+
+  it('prints a link annotation as large as the screenshot on a linked scope-shot page', async () => {
+    const outPath = join(outDir, 'scope-links.pdf');
+    await renderPdf(deck, outPath);
+    const pdf = await PDFDocument.load(readFileSync(outPath));
+    const shotIndex = deck.slides.findIndex((s) => s.layout === 'scope-shot');
+    expect(shotIndex).toBeGreaterThan(-1);
+    const page = pdf.getPage(shotIndex);
+    const annots = page.node.Annots();
+    if (annots === undefined) throw new Error('no link annotations on the scope-shot page');
+    const heights: number[] = [];
+    for (let i = 0; i < annots.size(); i += 1) {
+      const annot = pdf.context.lookup(annots.get(i));
+      if (!(annot instanceof PDFDict)) continue;
+      const rect = annot.lookup(PDFName.of('Rect'));
+      if (!(rect instanceof PDFArray)) continue;
+      const [, y0, , y1] = rect.asArray().map((n) => (n instanceof PDFNumber ? n.asNumber() : 0));
+      heights.push(Math.abs((y1 ?? 0) - (y0 ?? 0)));
+    }
+    /* the caption link is ~20pt tall; the screenshot link is hundreds of points tall */
+    expect(Math.max(...heights)).toBeGreaterThan(400);
   });
 });
 

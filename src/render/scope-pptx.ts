@@ -115,10 +115,10 @@ const paintBullets = (slide: CustomSlide, p: PlacedBullets): void => {
 const paintNotes = (slide: CustomSlide, p: PlacedNotes): void => {
   const indentPt = Math.round(p.sizePt * NOTE_STYLE.indentEm);
   const runs = p.columns.flatMap((col, index) => [
-    { text: col.header, options: { bold: true, breakLine: true, ...(index > 0 && { paraSpaceBefore: NOTE_STYLE.spaceBeforePt }) } },
-    ...bulletRuns(col.bullets, indentPt, NOTE_STYLE.spaceBeforePt).map((r) => ({
+    { text: col.header, options: { bold: true, breakLine: true, ...(index > 0 && { paraSpaceBefore: p.gapPt }) } },
+    ...bulletRuns(col.bullets, indentPt, p.gapPt).map((r) => ({
       ...r,
-      options: { ...r.options, paraSpaceBefore: NOTE_STYLE.spaceBeforePt },
+      options: { ...r.options, paraSpaceBefore: p.gapPt },
     })),
   ]);
   const box: PtText = { ...p.box, sizePt: p.sizePt, font: 'regular', color: '#000000', align: 'left', vAlign: 'top' };
