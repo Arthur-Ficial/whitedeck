@@ -4,6 +4,8 @@ import { NOTE_STYLE } from './scope-layout.js';
 /* Custom layouts are painted as absolutely positioned HTML with inline
    geometry, so the Marp theme needs no per-layout rules and the pixel
    positions come from the same placement list as pptx and Keynote. */
+/* Same blue as the pptx / Keynote link runs (LINK_COLOR in scope-pptx). */
+const LINK_COLOR = '#0000EE';
 const FONT_WEIGHT = { light: 300, regular: 400, medium: 500, bold: 700 };
 const FLEX_JUSTIFY = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
 const boxStyle = (r) => `position:absolute;left:${ptToPx(r.x)}px;top:${ptToPx(r.y)}px;width:${ptToPx(r.w)}px;height:${ptToPx(r.h)}px;`;
@@ -12,10 +14,15 @@ const textStyle = (t) => `${boxStyle(t)}font-size:${t.sizePt}pt;font-weight:${FO
 /* The box is a flex column (vertical alignment); one inner span keeps the
    inline runs together as a single flex item instead of one item per run. */
 const textHtml = (p) => `<div class="wd-text" style="${textStyle(p.box)}"><span>${inlineToHtml(p.text)}</span></div>`;
+/* A linked screenshot is wrapped in an anchor that carries the image's own
+   geometry: an inline anchor around an absolutely positioned img has no area,
+   so Chromium's PDF would print no link annotation over the picture. */
 const imageHtml = (p, marpSrc) => {
     const outline = p.border === undefined ? '' : `outline:${ptToPx(BORDER_PT)}px solid ${p.border};outline-offset:-${ptToPx(BORDER_PT / 2)}px;`;
-    const img = `<img class="wd-placed" src="${marpSrc(p.path)}" style="${boxStyle(p.rect)}${outline}">`;
-    return p.url === undefined ? img : `<a href="${p.url.replaceAll('"', '&quot;')}">${img}</a>`;
+    if (p.url === undefined)
+        return `<img class="wd-placed" src="${marpSrc(p.path)}" style="${boxStyle(p.rect)}${outline}">`;
+    const img = `<img class="wd-placed wd-linked" src="${marpSrc(p.path)}" style="${outline}">`;
+    return `<a class="wd-image-link" href="${p.url.replaceAll('"', '&quot;')}" style="${boxStyle(p.rect)}">${img}</a>`;
 };
 const rectHtml = (rect, fill) => `<div class="wd-rect" style="${boxStyle(rect)}background:${fill};"></div>`;
 const listHtml = (items, { indentPx, gapPt, pct, flush }) => {
@@ -30,8 +37,8 @@ const notesHtml = (p) => {
     const box = { ...p.box, sizePt: p.sizePt, font: 'regular', color: '#000000', align: 'left', vAlign: 'top' };
     const indentPx = ptToPx(p.sizePt * NOTE_STYLE.indentEm);
     const groups = p.columns
-        .map((col, index) => `<h3 style="margin:${index === 0 ? 0 : NOTE_STYLE.spaceBeforePt}pt 0 0 0;font-size:${p.sizePt}pt;font-weight:700;">${inlineToHtml(col.header)}</h3>` +
-        listHtml(col.bullets, { indentPx, gapPt: NOTE_STYLE.spaceBeforePt, pct: NOTE_STYLE.bulletSizePct, flush: false }))
+        .map((col, index) => `<h3 style="margin:${index === 0 ? 0 : p.gapPt}pt 0 0 0;font-size:${p.sizePt}pt;font-weight:700;">${inlineToHtml(col.header)}</h3>` +
+        listHtml(col.bullets, { indentPx, gapPt: p.gapPt, pct: NOTE_STYLE.bulletSizePct, flush: false }))
         .join('');
     return `<div class="wd-text wd-notes" style="${textStyle(box)}">${groups}</div>`;
 };
@@ -52,7 +59,9 @@ export const placedToHtml = (placed, marpSrc) => `<div class="wd-custom">${place
 export const customLayoutCss = () => [
     'section .wd-custom { position: absolute; inset: 0; }',
     'section .wd-text { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; overflow-wrap: anywhere; }',
-    'section .wd-text a { color: inherit; text-decoration: underline; }',
+    `section .wd-text a { color: ${LINK_COLOR}; text-decoration: underline; }`,
+    'section a.wd-image-link { display: block; }',
+    'section img.wd-linked { position: absolute; inset: 0; width: 100%; height: 100%; }',
     'section .wd-list { list-style: none; padding: 0; margin: 0; }',
     'section .wd-flush li:first-child { margin-top: 0 !important; }',
     'section .wd-bullet { margin-right: 0.45em; line-height: 0; }',

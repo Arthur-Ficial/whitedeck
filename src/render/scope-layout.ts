@@ -26,7 +26,7 @@ import {
   type PtText,
 } from '../theme/scope.js';
 import { inlineVisibleText, parseInline } from '../parse/inline.js';
-import { fittedNotesSizePt, fittedSizePt } from './fit.js';
+import { fittedNotesSizePt, fittedSizePt, notesHeightPt, scaledGapPt } from './fit.js';
 import { imageSize } from './geometry.js';
 
 /* Everything a custom layout paints, in points, in paint order. The three
@@ -50,6 +50,8 @@ export interface PlacedNotes {
   readonly kind: 'notes';
   readonly box: PtRect;
   readonly sizePt: number;
+  /** Paragraph gap at `sizePt` - NOTES.spaceBeforePt scaled down with the text. */
+  readonly gapPt: number;
   readonly columns: readonly DeckColumn[];
 }
 export interface PlacedImage {
@@ -139,13 +141,25 @@ const labelBars = (images: readonly DeckImage[]): Placed[] => {
 };
 
 /* A long IS / SHOULD block shrinks like a Keynote body placeholder would;
-   the gap between paragraphs shrinks with it (see NOTES.spaceBeforePt). */
+   the gap between paragraphs shrinks with it (NOTES.spaceBeforePt scaled). */
 const MIN_NOTES_PT = 20;
+/* Text is never painted outside its box: a block that does not fit even at
+   the minimum size is a build error naming the offending lines, not a slide
+   with text running into the caption (seen 2026-09-11 on a GSC slide). */
 const notes = (box: PtRect, sizePt: number, columns: readonly DeckColumn[] | undefined): Placed[] => {
   if (columns === undefined || columns.length === 0) return [];
   const groups = columns.map((c) => ({ header: inlineVisibleText(c.header), lines: c.bullets.map((b) => inlineVisibleText(b.text)) }));
   const fit = fittedNotesSizePt(groups, { widthPt: box.w, heightPt: box.h, sizePt, minPt: MIN_NOTES_PT }, NOTES.spaceBeforePt);
-  return [{ kind: 'notes', box, sizePt: fit, columns }];
+  const gapPt = scaledGapPt(NOTES.spaceBeforePt, fit, sizePt);
+  const heightPt = notesHeightPt(groups, box.w, fit, gapPt);
+  if (heightPt > box.h) {
+    const lines = groups.flatMap((g) => [g.header, ...g.lines]).join(' / ');
+    throw new Error(
+      `notes block does not fit its ${Math.round(box.w)}x${Math.round(box.h)}pt box even at ${MIN_NOTES_PT}pt ` +
+        `(needs ${Math.round(heightPt)}pt) - shorten or drop lines: ${lines}`,
+    );
+  }
+  return [{ kind: 'notes', box, sizePt: fit, gapPt, columns }];
 };
 
 const scopeShot = (slide: DeckSlide): Placed[] => {
@@ -216,8 +230,13 @@ const leftBody = (slide: DeckSlide): Placed[] => {
  */
 export const placeCustomSlide = (slide: DeckSlide, meta: DeckMeta): Placed[] => {
   if (!isCustomLayout(slide.layout)) throw new Error(`${slide.layout} is not a custom layout`);
-  if (isScopeLayout(slide.layout)) return [...header(slide), ...scopeBody(slide), ...caption(slide), ...logo(meta)];
-  return [...leftBody(slide), ...logo(meta)];
+  try {
+    if (isScopeLayout(slide.layout)) return [...header(slide), ...scopeBody(slide), ...caption(slide), ...logo(meta)];
+    return [...leftBody(slide), ...logo(meta)];
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`slide "${slide.title ?? slide.layout}": ${message}`);
+  }
 };
 
 /** The logo alone - painted on the Keynote-geometry layouts too. */

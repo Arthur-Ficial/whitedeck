@@ -213,6 +213,12 @@ const slideStatements = (slide: DeckSlide, images: readonly PlacedImage[], meta:
   ];
 };
 
+/* osascript gives every Apple event 60 seconds by default; importing a pptx
+   with a dozen full-size screenshots takes Keynote longer than that when it
+   is busy with other documents (seen 2026-09-11: "AppleEvent timed out
+   (-1712)"). The import is wrapped in an explicit, generous timeout. */
+const IMPORT_TIMEOUT_SECONDS = 600;
+
 const buildScript = (deck: Deck, imagesPerSlide: readonly PlacedImage[][], outPath: string): string =>
   [
     'on clearMasterText(s)',
@@ -235,6 +241,7 @@ const buildScript = (deck: Deck, imagesPerSlide: readonly PlacedImage[][], outPa
     '  end tell',
     'end pickMaster',
     '',
+    `with timeout of ${IMPORT_TIMEOUT_SECONDS} seconds`,
     'tell application "Keynote"',
     '  set d to make new document with properties {document theme:theme "White", width:1920, height:1080}',
     ...deck.slides.flatMap((slide, i) =>
@@ -244,6 +251,7 @@ const buildScript = (deck: Deck, imagesPerSlide: readonly PlacedImage[][], outPa
     `  save d in POSIX file ${str(resolve(outPath))}`,
     '  close d saving no',
     'end tell',
+    'end timeout',
   ].join('\n');
 
 export const runAppleScript = async (script: string, args: readonly string[] = []): Promise<string> => {
@@ -276,11 +284,13 @@ const needsImport = (deck: Deck): boolean =>
 
 const importScript = (pptxPath: string, outPath: string): string =>
   [
-    'tell application "Keynote"',
-    `  set d to open (POSIX file ${str(pptxPath)})`,
-    `  save d in POSIX file ${str(resolve(outPath))}`,
-    '  close d saving no',
-    'end tell',
+    `with timeout of ${IMPORT_TIMEOUT_SECONDS} seconds`,
+    '  tell application "Keynote"',
+    `    set d to open (POSIX file ${str(pptxPath)})`,
+    `    save d in POSIX file ${str(resolve(outPath))}`,
+    '    close d saving no',
+    '  end tell',
+    'end timeout',
   ].join('\n');
 
 const renderKeyByImport = async (deck: Deck, outPath: string): Promise<void> => {

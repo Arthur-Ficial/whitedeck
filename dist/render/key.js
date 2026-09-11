@@ -191,6 +191,11 @@ const slideStatements = (slide, images, meta) => {
         ...placedStatements(placeLogo(meta)),
     ];
 };
+/* osascript gives every Apple event 60 seconds by default; importing a pptx
+   with a dozen full-size screenshots takes Keynote longer than that when it
+   is busy with other documents (seen 2026-09-11: "AppleEvent timed out
+   (-1712)"). The import is wrapped in an explicit, generous timeout. */
+const IMPORT_TIMEOUT_SECONDS = 600;
 const buildScript = (deck, imagesPerSlide, outPath) => [
     'on clearMasterText(s)',
     '  tell application "Keynote"',
@@ -212,6 +217,7 @@ const buildScript = (deck, imagesPerSlide, outPath) => [
     '  end tell',
     'end pickMaster',
     '',
+    `with timeout of ${IMPORT_TIMEOUT_SECONDS} seconds`,
     'tell application "Keynote"',
     '  set d to make new document with properties {document theme:theme "White", width:1920, height:1080}',
     ...deck.slides.flatMap((slide, i) => slideStatements(slide, imagesPerSlide[i] ?? [], deck.meta).map((line) => `  ${line}`)),
@@ -219,6 +225,7 @@ const buildScript = (deck, imagesPerSlide, outPath) => [
     `  save d in POSIX file ${str(resolve(outPath))}`,
     '  close d saving no',
     'end tell',
+    'end timeout',
 ].join('\n');
 export const runAppleScript = async (script, args = []) => {
     const { stdout } = await execFileAsync('osascript', ['-e', script, ...args]);
@@ -245,11 +252,13 @@ const quitKeynoteIfIdle = async () => {
    Keynote-geometry decks keep the master-slide path. */
 const needsImport = (deck) => deck.meta.logo !== undefined || deck.slides.some((slide) => isCustomLayout(slide.layout));
 const importScript = (pptxPath, outPath) => [
-    'tell application "Keynote"',
-    `  set d to open (POSIX file ${str(pptxPath)})`,
-    `  save d in POSIX file ${str(resolve(outPath))}`,
-    '  close d saving no',
-    'end tell',
+    `with timeout of ${IMPORT_TIMEOUT_SECONDS} seconds`,
+    '  tell application "Keynote"',
+    `    set d to open (POSIX file ${str(pptxPath)})`,
+    `    save d in POSIX file ${str(resolve(outPath))}`,
+    '    close d saving no',
+    '  end tell',
+    'end timeout',
 ].join('\n');
 const renderKeyByImport = async (deck, outPath) => {
     const pptxPath = join(mkdtempSync(join(tmpdir(), 'whitedeck-key-')), 'deck.pptx');

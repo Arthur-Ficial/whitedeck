@@ -6,6 +6,9 @@ import { NOTE_STYLE, type Placed, type PlacedBullets, type PlacedImage, type Pla
    geometry, so the Marp theme needs no per-layout rules and the pixel
    positions come from the same placement list as pptx and Keynote. */
 
+/* Same blue as the pptx / Keynote link runs (LINK_COLOR in scope-pptx). */
+const LINK_COLOR = '#0000EE';
+
 const FONT_WEIGHT: Readonly<Record<PtText['font'], number>> = { light: 300, regular: 400, medium: 500, bold: 700 };
 const FLEX_JUSTIFY: Readonly<Record<PtText['vAlign'], string>> = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
 
@@ -21,10 +24,14 @@ const textStyle = (t: PtText): string =>
 const textHtml = (p: PlacedText): string =>
   `<div class="wd-text" style="${textStyle(p.box)}"><span>${inlineToHtml(p.text)}</span></div>`;
 
+/* A linked screenshot is wrapped in an anchor that carries the image's own
+   geometry: an inline anchor around an absolutely positioned img has no area,
+   so Chromium's PDF would print no link annotation over the picture. */
 const imageHtml = (p: PlacedImage, marpSrc: (path: string) => string): string => {
   const outline = p.border === undefined ? '' : `outline:${ptToPx(BORDER_PT)}px solid ${p.border};outline-offset:-${ptToPx(BORDER_PT / 2)}px;`;
-  const img = `<img class="wd-placed" src="${marpSrc(p.path)}" style="${boxStyle(p.rect)}${outline}">`;
-  return p.url === undefined ? img : `<a href="${p.url.replaceAll('"', '&quot;')}">${img}</a>`;
+  if (p.url === undefined) return `<img class="wd-placed" src="${marpSrc(p.path)}" style="${boxStyle(p.rect)}${outline}">`;
+  const img = `<img class="wd-placed wd-linked" src="${marpSrc(p.path)}" style="${outline}">`;
+  return `<a class="wd-image-link" href="${p.url.replaceAll('"', '&quot;')}" style="${boxStyle(p.rect)}">${img}</a>`;
 };
 
 const rectHtml = (rect: PtRect, fill: string): string =>
@@ -58,8 +65,8 @@ const notesHtml = (p: PlacedNotes): string => {
   const groups = p.columns
     .map(
       (col, index) =>
-        `<h3 style="margin:${index === 0 ? 0 : NOTE_STYLE.spaceBeforePt}pt 0 0 0;font-size:${p.sizePt}pt;font-weight:700;">${inlineToHtml(col.header)}</h3>` +
-        listHtml(col.bullets, { indentPx, gapPt: NOTE_STYLE.spaceBeforePt, pct: NOTE_STYLE.bulletSizePct, flush: false }),
+        `<h3 style="margin:${index === 0 ? 0 : p.gapPt}pt 0 0 0;font-size:${p.sizePt}pt;font-weight:700;">${inlineToHtml(col.header)}</h3>` +
+        listHtml(col.bullets, { indentPx, gapPt: p.gapPt, pct: NOTE_STYLE.bulletSizePct, flush: false }),
     )
     .join('');
   return `<div class="wd-text wd-notes" style="${textStyle(box)}">${groups}</div>`;
@@ -82,7 +89,9 @@ export const customLayoutCss = (): string =>
   [
     'section .wd-custom { position: absolute; inset: 0; }',
     'section .wd-text { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; overflow-wrap: anywhere; }',
-    'section .wd-text a { color: inherit; text-decoration: underline; }',
+    `section .wd-text a { color: ${LINK_COLOR}; text-decoration: underline; }`,
+    'section a.wd-image-link { display: block; }',
+    'section img.wd-linked { position: absolute; inset: 0; width: 100%; height: 100%; }',
     'section .wd-list { list-style: none; padding: 0; margin: 0; }',
     'section .wd-flush li:first-child { margin-top: 0 !important; }',
     'section .wd-bullet { margin-right: 0.45em; line-height: 0; }',

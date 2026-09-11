@@ -18,6 +18,8 @@ export interface PlacedNotes {
     readonly kind: 'notes';
     readonly box: PtRect;
     readonly sizePt: number;
+    /** Paragraph gap at `sizePt` - NOTES.spaceBeforePt scaled down with the text. */
+    readonly gapPt: number;
     readonly columns: readonly DeckColumn[];
 }
 export interface PlacedImage {
