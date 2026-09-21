@@ -46,6 +46,8 @@
   "dependencies": {
     "@marp-team/marp-cli": "^4.2.3",
     "@modelcontextprotocol/sdk": "^1.12.0",
+    "@types/adm-zip": "^0.5.8",
+    "adm-zip": "^0.6.1",
     "gray-matter": "^4.0.3",
     "pptxgenjs": "^4.0.1",
     "zod": "^4.4.3"

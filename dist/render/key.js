@@ -251,10 +251,30 @@ const quitKeynoteIfIdle = async () => {
    image link, bold runs, bars and borders as native objects. Plain
    Keynote-geometry decks keep the master-slide path. */
 const needsImport = (deck) => deck.meta.logo !== undefined || deck.slides.some((slide) => isCustomLayout(slide.layout));
+/* Keynote's `open` does NOT reliably return a document for an imported pptx: on
+   Keynote 15.3.1 it hands back an `unmerge id` placeholder from the iCloud
+   document-merge machinery, and `save` on that dies with
+   `unmerge id "..." doesn't understand the "save" message`, or with
+   `Can't make missing value into type specifier (-1700)` when the placeholder is
+   empty, or with `AppleEvent timed out (-1712)` when the import is still running.
+   Never use the return value: count the documents first, open, poll until the
+   count rises, then take `front document`. Targeting the bundle id rather than the
+   name also matters - the .app may be renamed on disk, and the error text then
+   names the renamed file, which looks like a different application entirely. */
+const IMPORT_POLL_TRIES = 240;
+const IMPORT_POLL_DELAY_SECONDS = 5;
 const importScript = (pptxPath, outPath) => [
     `with timeout of ${IMPORT_TIMEOUT_SECONDS} seconds`,
-    '  tell application "Keynote"',
-    `    set d to open (POSIX file ${str(pptxPath)})`,
+    '  tell application id "com.apple.Keynote"',
+    '    set priorCount to count of documents',
+    `    open (POSIX file ${str(pptxPath)})`,
+    `    repeat ${IMPORT_POLL_TRIES} times`,
+    `      delay ${IMPORT_POLL_DELAY_SECONDS}`,
+    '      if (count of documents) > priorCount then exit repeat',
+    '    end repeat',
+    '    if (count of documents) is priorCount then error "Keynote did not open " & ' +
+        `${str(pptxPath)}`,
+    '    set d to front document',
     `    save d in POSIX file ${str(resolve(outPath))}`,
     '    close d saving no',
     '  end tell',

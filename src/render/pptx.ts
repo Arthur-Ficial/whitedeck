@@ -1,4 +1,5 @@
 
+import AdmZip from 'adm-zip';
 import PptxGenJSImport from 'pptxgenjs';
 import type { Deck, DeckMeta, DeckSlide } from '../parse/deck.js';
 import type { ThemeLayout, ThemePlaceholder } from '../theme/types.js';
@@ -201,6 +202,37 @@ const addSlideContent = (target: PptxSlide, slide: DeckSlide, meta: DeckMeta): v
   addSource(target, slide);
 };
 
+/* pptxgenjs 4.0.1 writes a hyperlink's URL into the slide's .rels part WITHOUT
+   XML-escaping it, so a query string like
+   `...?resource_id=x&id=y&alt_id=z&hl=en` lands as a raw `&` in the XML. That
+   is not well-formed XML. PowerPoint and Google Slides are lenient about it,
+   which is why the file looks fine, but strict readers reject the package:
+   lxml refuses it with "EntityRef: expecting ';'", and Keynote refuses the
+   whole import with "deck.pptx can't be opened right now. Keynote couldn't
+   read the file." - which is what blocked every .key build of a deck whose
+   captions link to Search Console.
+   Escape bare ampersands in every Target attribute after pptxgenjs is done.
+   `&amp;` is the correct encoding of `&`, so the URL is unchanged. */
+const BARE_AMP = /&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g;
+
+const escapeRelationshipTargets = async (pptxPath: string): Promise<void> => {
+  const zip = new AdmZip(pptxPath);
+  let changed = false;
+  for (const entry of zip.getEntries()) {
+    if (!entry.entryName.endsWith('.rels')) continue;
+    const xml = entry.getData().toString('utf8');
+    const fixed = xml.replace(/Target="([^"]*)"/g, (whole, url: string) => {
+      const escaped = url.replace(BARE_AMP, '&amp;');
+      return escaped === url ? whole : `Target="${escaped}"`;
+    });
+    if (fixed !== xml) {
+      zip.updateFile(entry.entryName, Buffer.from(fixed, 'utf8'));
+      changed = true;
+    }
+  }
+  if (changed) zip.writeZip(pptxPath);
+};
+
 export const renderPptx = async (deck: Deck, outPath: string): Promise<void> => {
   const pptx = new PptxGenJS();
   pptx.defineLayout({
@@ -218,4 +250,5 @@ export const renderPptx = async (deck: Deck, outPath: string): Promise<void> => 
     addSlideContent(target, slide, deck.meta);
   }
   await pptx.writeFile({ fileName: outPath });
+  await escapeRelationshipTargets(outPath);
 };
