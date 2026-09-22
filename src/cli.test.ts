@@ -26,22 +26,54 @@ describe('whitedeck CLI (built artifact, end to end)', () => {
     await execFileAsync('npm', ['run', 'build'], { cwd: ROOT });
   }, 120_000);
 
-  it('builds html, pdf and pptx from the example deck', async () => {
+  it('names every output after the deck title, not after the input file', async () => {
     const outDir = mkdtempSync(join(tmpdir(), 'whitedeck-cli-'));
-    const { code, stderr } = await runCli(['build', DEMO, '-f', 'html,pdf,pptx', '-o', outDir]);
+    const { code, stderr, stdout } = await runCli(['build', DEMO, '-f', 'html,pdf,pptx', '-o', outDir]);
 
     expect(stderr).toBe('');
     expect(code).toBe(0);
-    expect(existsSync(join(outDir, 'demo.html'))).toBe(true);
-    expect(existsSync(join(outDir, 'demo.pdf'))).toBe(true);
-    expect(existsSync(join(outDir, 'demo.pptx'))).toBe(true);
+    expect(existsSync(join(outDir, 'whitedeck-demo.html'))).toBe(true);
+    expect(existsSync(join(outDir, 'whitedeck-demo.pdf'))).toBe(true);
+    expect(existsSync(join(outDir, 'whitedeck-demo.pptx'))).toBe(true);
+    expect(stdout).toContain('whitedeck-demo.pptx');
   });
 
-  it('builds from stdin', async () => {
+  it('names a stdin deck after its headline instead of "deck"', async () => {
     const outDir = mkdtempSync(join(tmpdir(), 'whitedeck-cli-'));
     const { code } = await runCli(['build', '-', '-f', 'pptx', '-o', outDir], '# From stdin');
     expect(code).toBe(0);
-    expect(existsSync(join(outDir, 'deck.pptx'))).toBe(true);
+    expect(existsSync(join(outDir, 'from-stdin.pptx'))).toBe(true);
+    expect(existsSync(join(outDir, 'deck.pptx'))).toBe(false);
+  });
+
+  it('honours an explicit --name over the deck title', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'whitedeck-cli-'));
+    const { code } = await runCli(['build', DEMO, '-f', 'pptx', '-o', outDir, '--name', 'board-2026-q3']);
+    expect(code).toBe(0);
+    expect(existsSync(join(outDir, 'board-2026-q3.pptx'))).toBe(true);
+  });
+
+  it('writes to an -o path that names a file, taking the format from its extension', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'whitedeck-cli-'));
+    const target = join(outDir, 'nested', 'investor-update.pptx');
+    const { code, stderr } = await runCli(['build', DEMO, '-o', target]);
+    expect(stderr).toBe('');
+    expect(code).toBe(0);
+    expect(existsSync(target)).toBe(true);
+  });
+
+  it('refuses an -o file path when several formats are requested', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'whitedeck-cli-'));
+    const { code, stderr } = await runCli(['build', DEMO, '-f', 'html,pptx', '-o', join(outDir, 'x.pptx')]);
+    expect(code).toBe(2);
+    expect(stderr).toMatch(/single format/i);
+  });
+
+  it('fails loudly when a stdin deck has no title to name the file after', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'whitedeck-cli-'));
+    const { code, stderr } = await runCli(['build', '-', '-f', 'pptx', '-o', outDir], '- only a bullet');
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/no title/i);
   });
 
   it('init scaffolds a deck that builds standalone, images included', async () => {
@@ -51,7 +83,7 @@ describe('whitedeck CLI (built artifact, end to end)', () => {
     const buildRes = await runCli(['build', join(outDir, 'my.md'), '-f', 'pptx']);
     expect(buildRes.stderr).toBe('');
     expect(buildRes.code).toBe(0);
-    expect(existsSync(join(outDir, 'my.pptx'))).toBe(true);
+    expect(existsSync(join(outDir, 'whitedeck-demo.pptx'))).toBe(true);
   });
 
   it('lists all 12 layouts as json', async () => {

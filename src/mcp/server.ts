@@ -4,6 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { OUTPUT_FORMATS, renderFormat, resolveFormats } from '../formats.js';
+import { deckFileBase } from '../name.js';
 import { parseDeck } from '../parse/deck.js';
 import { LAYOUT_IDS, layoutOf } from '../theme/white.js';
 
@@ -44,12 +45,15 @@ server.registerTool(
       markdown: z.string().describe('The deck markdown'),
       formats: z.array(z.enum(['html', 'pdf', 'pptx', 'key', 'all'])).describe('Output formats'),
       outDir: z.string().describe('Directory to write output files into'),
-      name: z.string().optional().describe('Base file name (default: deck)'),
+      name: z
+        .string()
+        .optional()
+        .describe('Base file name without extension (default: a slug of the deck title, e.g. q3-revenue-review)'),
     },
   },
   async ({ markdown, formats, outDir, name }) => {
     const deck = parseDeck(markdown);
-    const baseName = name ?? 'deck';
+    const baseName = name ?? deckFileBase(deck, undefined);
     const files: string[] = [];
     const resolved = formats.flatMap((format) => resolveFormats(format));
     for (const format of [...new Set(resolved)]) {

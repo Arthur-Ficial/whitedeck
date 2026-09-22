@@ -55,4 +55,16 @@ describe('whitedeck MCP server (real stdio round-trip)', () => {
     expect(report.files).toHaveLength(1);
     expect(existsSync(report.files[0] ?? '')).toBe(true);
   });
+
+  it('names the file after the deck title when no name is given', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'whitedeck-mcp-'));
+    const result = await client.callTool({
+      name: 'whitedeck_build',
+      arguments: { markdown: '# Ueber die Zukunft der Suche', formats: ['pptx'], outDir },
+    });
+    const text = (result.content as { type: string; text: string }[])[0]?.text ?? '';
+    const report = JSON.parse(text) as { files: string[] };
+    expect(report.files[0]).toBe(join(outDir, 'ueber-die-zukunft-der-suche.pptx'));
+    expect(existsSync(report.files[0] ?? '')).toBe(true);
+  });
 });
