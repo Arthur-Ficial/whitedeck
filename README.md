@@ -99,10 +99,29 @@ colour runs survive into PPTX and Keynote. See `examples/scope-demo.md` and the 
 ```bash
 whitedeck build deck.md -f html,pdf,pptx -o out/   # render formats
 whitedeck build - -f pptx < deck.md                # stdin
+whitedeck build deck.md -o out/board-q3.pptx       # exact file, format from the extension
+whitedeck build deck.md -f all --name board-q3     # explicit base name
 whitedeck layouts --json                           # machine-readable layout list
 whitedeck validate deck.md                         # JSON report, exit 1 on errors
 whitedeck init [name]                              # scaffold an example deck
 ```
+
+### Output file names
+
+Outputs are named after the **deck**, not after the input file: the front-matter `title`
+(or, without one, the first headline) becomes a slug.
+
+```
+---
+title: Q3 Revenue Review
+---
+```
+
+→ `q3-revenue-review.html`, `q3-revenue-review.pdf`, `q3-revenue-review.pptx`,
+`q3-revenue-review.key` - whatever the markdown file or the stdin pipe was called.
+Umlauts transliterate (`Über Größe` → `ueber-groesse`), slugs are capped at 60 characters
+on a word boundary. Override with `--name <base>` or `-o <dir>/<file>.<format>`. A deck with
+no title and no input file name (stdin) is an error, not a file called `deck`.
 
 ## For AI agents
 

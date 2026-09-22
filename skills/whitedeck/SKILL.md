@@ -38,9 +38,16 @@ tell the whole story.
 npm install -g https://github.com/franzenzenhofer/whitedeck/archive/refs/heads/main.tar.gz   # once
 whitedeck build deck.md -f pptx           # editable PowerPoint
 whitedeck build deck.md -f all -o out/    # html + pdf + pptx (+ native .key on macOS)
+whitedeck build deck.md -f all --name q3  # override the derived file name
 whitedeck layouts                         # list layouts
 whitedeck validate deck.md                # JSON report, exit 1 on errors
 ```
+
+**Output file names come from the deck, not the input file.** The front-matter `title` (or the
+first headline) is slugified: `title: Q3 Revenue Review` → `q3-revenue-review.pptx|pdf|html|key`.
+So always give the deck a real `title:` - it is what the client sees in their downloads folder.
+Never hand over a file called `deck.key`. Use `--name <base>` only when the file must match an
+external convention (ticket id, client naming scheme); a deck without any title fails the build.
 
 MCP alternative: `claude mcp add whitedeck -- whitedeck-mcp`
 (tools: `whitedeck_build`, `whitedeck_layouts`, `whitedeck_validate`).

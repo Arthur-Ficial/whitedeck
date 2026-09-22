@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, extname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { inlineToPlain, parseInline } from '../parse/inline.js';
 import { isCustomLayout } from '../theme/scope.js';
@@ -281,7 +281,11 @@ const importScript = (pptxPath, outPath) => [
     'end timeout',
 ].join('\n');
 const renderKeyByImport = async (deck, outPath) => {
-    const pptxPath = join(mkdtempSync(join(tmpdir(), 'whitedeck-key-')), 'deck.pptx');
+    /* Keynote names the imported document after the file it came from, and that name
+       shows in its window and in error sheets - so the bridge file carries the deck's
+       own name, not a generic "deck.pptx". */
+    const stem = basename(outPath, extname(outPath));
+    const pptxPath = join(mkdtempSync(join(tmpdir(), 'whitedeck-key-')), `${stem}.pptx`);
     await renderPptx(deck, pptxPath);
     await runAppleScript(importScript(pptxPath, outPath));
 };
