@@ -176,3 +176,68 @@ for section dividers with one line of text.
 - Titles get Helvetica Neue Medium 112pt automatically - never restyle output files.
 - Image paths resolve relative to the markdown file.
 - `-f key` needs macOS + Keynote (runs in background, quits after). Elsewhere use pptx.
+
+## Best practice: the IS / SHOULD / WHY audit deck
+
+Franz's preferred shape for any onpage audit (titles, meta descriptions, markup, headings).
+**Report, do not interpret.** Three slides per URL, `title-bullets-left` throughout:
+
+```markdown
+<!-- _class: title-bullets-left -->
+
+# IS: Hiking Trail Page
+
+- [https://www.asi-reisen.de/fw/lykischerweg](https://www.asi-reisen.de/fw/lykischerweg)
+- <title>Lykischer Weg: Etappen, Höhenmeter & weitere Infos</title>
+- <meta name="description" content="Sie möchten gerne ins Land der aufgehenden Sonne reisen ..."/>
+
+---
+
+<!-- _class: title-bullets-left -->
+
+# SHOULD: Hiking Trail Page
+
+- [https://www.asi-reisen.de/fw/lykischerweg](https://www.asi-reisen.de/fw/lykischerweg)
+- <title>Lykischer Weg: 540 km, 26 Etappen, 29.232 hm - ASI Reisen</title>
+- <meta name="description" content="540 km, 26 Etappen und 29.232 Höhenmeter von Fethiye nach Antalya: ..."/>
+
+---
+
+<!-- _class: title-bullets-left -->
+
+# WHY: Hiking Trail Page
+
+- "Land der aufgehenden Sonne" is Japan. The page is a trail in Turkey
+- Google: ["Make sure your descriptions are truly descriptive."](https://developers.google.com/search/docs/appearance/snippet#:~:text=Make%20sure%20your%20descriptions%20are%20truly%20descriptive.)
+- Franz V3.5: SEO Title = targeted phrase + click through trigger (**numbers**) + brand
+- All three numbers are printed on that page: "Länge: 540 km, Höhenmeter: 29.232 hm"
+```
+
+Hard rules of this deck type:
+
+1. **The element, whole, never a paraphrase.** `<title>...</title>` and
+   `<meta name="description" content="..."/>` complete, verbatim, opening and closing tag
+   included. Never "boilerplate title", never "add a number here", never a half tag.
+   Machine-check the IS strings against the captured JSON before building.
+2. **URL first, as a clickable link**, on both the IS and the SHOULD slide - the same URL,
+   so the two slides are provably about one page.
+3. **Headline is the state**: `IS: <page type>` / `SHOULD: <page type>` / `WHY: <page type>`.
+   This is the one deck type where the headline is a label, not an assertion - the assertion
+   is the markup itself.
+4. **SHOULD is a finished string a developer can paste**, built only from values printed on
+   that page. No placeholders.
+5. **WHY carries the citations**: the Google sentence as a `#:~:text=` deep link plus the
+   Franz checklist rule, and one line naming where the SHOULD's numbers come from.
+6. **IS equals SHOULD → paint it green** in *both* slides, with the reason spelled out:
+   `- [<title>...</title>]{#1db100} **- identical in IS and SHOULD, nothing to change**`
+   and announce the code once on the title slide: `[Green = IS and SHOULD are identical]{#1db100}`.
+7. Evidence screenshots (live SERP, tool output) go at the end on `photo-horizontal`, not
+   mixed into the IS/SHOULD run.
+
+Two things that bite:
+
+- **Literal HTML tags render fine** in bullets - `<title>Foo</title>` comes out as text in
+  html, pdf, pptx and key. No backticks needed (backticks are stripped), no entity escaping.
+- **Percent-encode `(` and `)` inside a link URL** (`%28`, `%29`). A raw `)` in a
+  `#:~:text=` fragment ends the markdown link early: the URL is truncated and a stray `)`
+  is printed. Always re-open a text-fragment link in Chrome and confirm it scrolls.
