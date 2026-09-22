@@ -3,7 +3,7 @@ import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } fro
 import { basename, dirname, extname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { OUTPUT_FORMATS, isOutputFormat, renderFormat, resolveFormats } from './formats.js';
-import { deckFileBase } from './name.js';
+import { checkedBaseName, deckFileBase } from './name.js';
 import { parseDeck } from './parse/deck.js';
 import { LAYOUT_IDS, layoutOf } from './theme/white.js';
 const USAGE = `Usage: whitedeck <command> [options]
@@ -66,7 +66,8 @@ const build = async (args) => {
         const outDir = target?.dir ?? resolve(previousCwd, values.out ?? dir);
         /* The file name is the deck's own title, so a folder of builds reads like a list of
            talks instead of a row of "deck.key" clones. */
-        const base = target?.base ?? values.name ?? deckFileBase(deck, name);
+        const explicit = target?.base ?? values.name;
+        const base = explicit === undefined ? deckFileBase(deck, name) : checkedBaseName(explicit);
         /* Keynote cannot save into a missing folder - it shows a modal error sheet
            and every later AppleEvent times out. Create the folder up front. */
         mkdirSync(outDir, { recursive: true });

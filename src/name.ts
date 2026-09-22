@@ -46,3 +46,16 @@ export const deckFileBase = (deck: Deck, inputName: string | undefined): string 
   if (fromInput !== '') return fromInput;
   throw new Error('Cannot name the output: the deck has no title. Add a "# Headline" or pass --name <base>.');
 };
+
+/**
+ * Guards an explicitly given base name (--name, MCP `name`): it names a file inside the
+ * output folder, never a path - otherwise a deck could write outside the folder it was
+ * pointed at.
+ */
+export const checkedBaseName = (name: string): string => {
+  if (/[/\\]/.test(name) || name === '.' || name === '..') {
+    throw new Error(`Output name "${name}" is a path - pass a plain file name and use -o for the folder.`);
+  }
+  if (name.trim() === '') throw new Error('Output name is empty - pass a file name or drop --name.');
+  return name;
+};

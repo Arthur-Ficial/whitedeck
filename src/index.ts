@@ -3,6 +3,7 @@ export type { Deck, DeckSlide, DeckBullet, DeckMeta } from './parse/deck.js';
 export { WHITE, LAYOUT_IDS, layoutOf } from './theme/white.js';
 export { OUTPUT_FORMATS, resolveFormats, renderFormat } from './formats.js';
 export type { OutputFormat } from './formats.js';
+export { deckFileBase, slugify, checkedBaseName } from './name.js';
 export { themeCss } from './render/css.js';
 export { renderHtml } from './render/html.js';
 export { renderPdf } from './render/pdf.js';

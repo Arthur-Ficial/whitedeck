@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseDeck } from './parse/deck.js';
-import { deckFileBase, slugify } from './name.js';
+import { checkedBaseName, deckFileBase, slugify } from './name.js';
 
 describe('slugify', () => {
   it('turns a headline into a lowercase hyphenated slug', () => {
@@ -58,5 +58,22 @@ describe('deckFileBase', () => {
   it('ignores inline markdown in the headline', () => {
     const deck = parseDeck('# The **fast** `whitedeck` way\n');
     expect(deckFileBase(deck, 'deck')).toBe('the-fast-whitedeck-way');
+  });
+});
+
+describe('checkedBaseName', () => {
+  it('passes an ordinary base name through unchanged', () => {
+    expect(checkedBaseName('board-2026-q3')).toBe('board-2026-q3');
+  });
+
+  it('rejects a name that would escape the output directory', () => {
+    expect(() => checkedBaseName('../../etc/passwd')).toThrow(/path/i);
+    expect(() => checkedBaseName('sub/deck')).toThrow(/path/i);
+    expect(() => checkedBaseName('sub\\deck')).toThrow(/path/i);
+  });
+
+  it('rejects an empty or dot-only name', () => {
+    expect(() => checkedBaseName('  ')).toThrow(/empty/i);
+    expect(() => checkedBaseName('..')).toThrow(/path/i);
   });
 });
