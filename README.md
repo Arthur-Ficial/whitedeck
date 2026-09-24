@@ -24,7 +24,7 @@ font and point size is extracted from Apple's own Keynote export into a single s
 | `html` | [Marp CLI](https://github.com/marp-team/marp-cli) + generated Keynote-exact CSS theme | self-contained file |
 | `pdf`  | same render, printed via headless Chrome | one 16:9 page per slide |
 | `pptx` | [PptxGenJS](https://github.com/gitbrent/PptxGenJS), native OOXML | fully **editable**, exact EMU geometry |
-| `key`  | AppleScript driving the real Keynote.app | true native White-theme masters (macOS only) |
+| `key`  | the pptx, imported and saved by the real Keynote.app, then reopened and checked | the verified pptx: clickable links, no theme dummy copy; the build throws on either (macOS only) |
 
 ## Writing decks
 
