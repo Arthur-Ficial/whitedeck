@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -107,6 +107,17 @@ describe('whitedeck CLI (built artifact, end to end)', () => {
     const { code, stderr } = await runCli(['validate', bad]);
     expect(code).toBe(1);
     expect(stderr).toContain('nope');
+  });
+
+  it('fails validation of a deck carrying theme dummy copy with exit 1', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'whitedeck-cli-'));
+    const bad = join(outDir, 'dummy.md');
+    writeFileSync(bad, '<!-- _class: quote -->\n\n> Type a quote here.\n> -- Johnny Appleseed\n');
+    const { code, stdout } = await runCli(['validate', bad]);
+    expect(code).toBe(1);
+    const report = JSON.parse(stdout) as { ok: boolean; errors: string[] };
+    expect(report.ok).toBe(false);
+    expect(report.errors).toHaveLength(2);
   });
 
   it('prints usage with exit 2 on unknown commands', async () => {

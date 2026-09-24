@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 import { OUTPUT_FORMATS, isOutputFormat, renderFormat, resolveFormats } from './formats.js';
 import { checkedBaseName, deckFileBase } from './name.js';
 import { parseDeck } from './parse/deck.js';
+import { dummyStringsIn } from './theme/dummy.js';
 import { LAYOUT_IDS, layoutOf } from './theme/white.js';
 const USAGE = `Usage: whitedeck <command> [options]
 
@@ -94,12 +95,17 @@ const validate = (args) => {
     const input = args[0] ?? fail(`validate needs an input file\n\n${USAGE}`, 2);
     const { markdown } = readInput(input);
     const deck = parseDeck(markdown);
+    // A deck whose own text carries theme dummy copy is broken before any render.
+    const errors = deck.slides.flatMap((slide, i) => dummyStringsIn(JSON.stringify(slide)).map((dummy) => `slide ${i + 1}: theme dummy text "${dummy}"`));
     const report = {
-        ok: true,
+        ok: errors.length === 0,
         slides: deck.slides.length,
+        ...(errors.length > 0 ? { errors } : {}),
         layouts: deck.slides.map((slide) => slide.layout),
     };
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (errors.length > 0)
+        process.exitCode = 1;
 };
 const init = (args) => {
     const target = resolve(args[0] ?? 'deck.md');

@@ -1,116 +1,112 @@
-import { existsSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import { parseDeck } from '../parse/deck.js';
-import { bodyText, renderKey, runAppleScript } from './key.js';
+import { THEME_DUMMY_STRINGS } from '../theme/dummy.js';
+import { importScript, keyDefects, readBackScript, renderKey, runAppleScript } from './key.js';
+import { renderPptx } from './pptx.js';
 
 const onMacWithKeynote = process.platform === 'darwin' && existsSync('/Applications/Keynote.app');
 
-const DEMO_MD = [
-  '<!-- _class: title -->',
-  '# Native Deck',
-  '## Built by whitedeck',
+/* The two slides that broke Franz's .key on 2026-09-24: a quote slide (theme
+   dummy copy painted over it) and a slide whose links came out as raw text. */
+const DECK_MD = [
+  '<!-- _class: quote -->',
+  '',
+  '> Content Marketing im AI Zeitalter?',
+  '> -- Q05 · Cluster C4 · Crawlability',
   '',
   '---',
   '',
   '<!-- _class: title-bullets -->',
-  '# Agenda',
-  '- First',
-  '- Second',
   '',
-  '---',
+  '# Every link stays a link',
   '',
-  '<!-- _class: quote -->',
-  '> "Real artists ship."',
-  '> -- Steve Jobs',
+  '- See [Search Console](https://search.google.com/search-console/index?resource_id=sc-domain%3Aexample.com)',
   '',
-  '---',
-  '',
-  '<!-- _class: photo-horizontal -->',
-  '# The ocean',
-  '![](examples/ocean.png)',
+  'Source: [web.dev, captured 2026-09-24](https://web.dev/articles/vitals#:~:text=75th%20percentile)',
 ].join('\n');
 
-const QUERY_SCRIPT = `
-on run argv
-  tell application "Keynote"
-    set d to open (POSIX file (item 1 of argv))
-    set n to count of slides of d
-    set w to width of d
-    set h to height of d
-    set ms to {}
-    repeat with s in slides of d
-      set end of ms to name of base slide of s
-    end repeat
-    set t to object text of default title item of slide 1 of d
-    close d saving no
-    if (count of documents) is 0 then quit
-  end tell
-  set AppleScript's text item delimiters to "|"
-  return (n as text) & "§" & (w as text) & "x" & (h as text) & "§" & (ms as text) & "§" & t
-end run
-`;
+const deck = parseDeck(DECK_MD);
 
-describe.skipIf(!onMacWithKeynote)('renderKey (real Keynote.app)', () => {
-  it('builds a 16:9 native .key on White theme masters with the requested layouts', async () => {
-    const outDir = mkdtempSync(join(tmpdir(), 'whitedeck-key-'));
-    const outPath = join(outDir, 'demo.key');
+describe('the .key is built by importing the pptx, never slide by slide', () => {
+  const script = importScript('/tmp/x/Deck.pptx', '/tmp/x/Deck.key');
 
-    await renderKey(parseDeck(DEMO_MD), outPath);
-    expect(existsSync(outPath)).toBe(true);
+  it('never selects a theme master, least of all "Quote"', () => {
+    expect(script).not.toMatch(/master slide/i);
+    expect(script).not.toContain('Quote');
+  });
 
-    const raw = await runAppleScript(QUERY_SCRIPT, [outPath]);
-    const [count, size, masters, firstTitle] = raw.split('§');
+  it('never writes text into a master placeholder', () => {
+    expect(script).not.toContain('default body item');
+    expect(script).not.toContain('default title item');
+    expect(script).not.toContain('object text');
+  });
 
-    expect(count).toBe('4');
-    expect(size).toBe('1920x1080');
-    expect(firstTitle).toBe('Native Deck');
-    const masterNames = (masters ?? '').split('|');
-    expect(masterNames[1]).toBe('Title & Bullets');
-    expect(masterNames[2]).toBe('Quote');
-    // A slide carrying an image is built on a TEXT master on purpose: the
-    // "Photo - Horizontal" master paints the theme's own stock photograph,
-    // which stayed visible behind a letterboxed chart, and its picture
-    // placeholder overlaps the title box (pic y -31..921 vs title y 749..907).
-    // whitedeck positions the picture itself instead. See geometry.test.ts.
-    expect(masterNames[3]).toBe('Title & Bullets');
+  it('never appends a URL as visible text', () => {
+    expect(script).not.toMatch(/ \(https?:\/\//);
+  });
+
+  it('opens the pptx and saves it as .key through the bundle id', () => {
+    expect(script).toContain('tell application id "com.apple.Keynote"');
+    expect(script).toContain('open (POSIX file "/tmp/x/Deck.pptx")');
+    expect(script).toContain('save d in POSIX file "/tmp/x/Deck.key"');
+  });
+
+  it('reads the saved .key back for the post-build check', () => {
+    const back = readBackScript('/tmp/x/Deck.key');
+    expect(back).toContain('open (POSIX file "/tmp/x/Deck.key")');
+    expect(back).toContain('close d saving no');
   });
 });
 
+describe('the pptx that becomes the .key places the quote itself', () => {
+  it('carries the question text and no theme dummy copy', async () => {
+    const outPath = join(mkdtempSync(join(tmpdir(), 'whitedeck-keyq-')), 'q.pptx');
+    await renderPptx(deck, outPath);
+    const zip = await JSZip.loadAsync(readFileSync(outPath));
+    const slide1 = (await zip.file('ppt/slides/slide1.xml')?.async('string')) ?? '';
+    expect(slide1).toContain('Content Marketing im AI Zeitalter?');
+    for (const dummy of THEME_DUMMY_STRINGS) expect(slide1).not.toContain(dummy);
+    const slide2 = (await zip.file('ppt/slides/slide2.xml')?.async('string')) ?? '';
+    expect(slide2).toContain('hlinkClick');
+    expect(slide2).not.toContain('(https://');
+  });
+});
 
-/**
- * Keynote renders no inline markdown, so every string handed to AppleScript
- * must already be flat. Regression: bullets and compare columns reached the
- * slide as literal "[label](https://...)".
- */
-describe('bodyText', () => {
-  const slide = (over: Record<string, unknown>) =>
-    ({ layout: 'title-bullets', bullets: [], images: [], ...over }) as never;
-
-  it('flattens markdown links in bullets', () => {
-    const text = bodyText(
-      slide({ bullets: [{ level: 0, text: '[bellaflora](https://www.bellaflora.at/)' }] }),
-    );
-    expect(text).not.toContain('](');
-    expect(text).toContain('bellaflora');
+describe('keyDefects: the build-time guard on a finished .key', () => {
+  it('passes clean slide text', () => {
+    expect(keyDefects(['Content Marketing im AI Zeitalter?', 'Every link stays a link\nSee Search Console'], deck)).toEqual([]);
   });
 
-  it('flattens markdown links in compare columns', () => {
-    const text = bodyText(
-      slide({
-        columns: [
-          { header: '**IS**', bullets: [{ level: 0, text: '[x](https://example.com/)' }] },
-        ],
-      }),
-    );
-    expect(text).not.toContain('](');
-    expect(text).not.toContain('**');
+  it('fails on the White theme dummy copy', () => {
+    const defects = keyDefects(['Type a quote here.\n-Johnny Appleseed', ''], deck);
+    expect(defects).toHaveLength(2);
+    expect(defects[0]).toContain('slide 1');
   });
 
-  it('flattens a quote and its attribution', () => {
-    const text = bodyText(slide({ quote: '**bold** quote', attribution: '[F](https://f.at/)' }));
-    expect(text).not.toContain('](');
-    expect(text).not.toContain('**');
+  it('fails on a link target printed as text', () => {
+    const defects = keyDefects(['', 'See Search Console (https://search.google.com/search-console/index?resource_id=sc-domain%3Aexample.com)'], deck);
+    expect(defects).toHaveLength(1);
+    expect(defects[0]).toContain('raw URL visible as text');
+  });
+
+  it('allows a URL the markdown itself shows as text', () => {
+    const q06 = parseDeck('<!-- _class: quote -->\n\n> LLMs.txt good/bad? (https://llmstxt.org/)\n> -- Q06');
+    expect(keyDefects(['LLMs.txt good/bad? (https://llmstxt.org/)'], q06)).toEqual([]);
+  });
+});
+
+describe.skipIf(!onMacWithKeynote)('renderKey (real Keynote.app)', () => {
+  it('builds a 1920x1080 .key with the deck\'s slides and passes its own post-build check', async () => {
+    const outPath = join(mkdtempSync(join(tmpdir(), 'whitedeck-key-')), 'demo.key');
+    await renderKey(deck, outPath); // throws on dummy text or a visible link target
+    expect(existsSync(outPath)).toBe(true);
+    const raw = await runAppleScript(
+      `tell application id "com.apple.Keynote"\n set d to open (POSIX file "${outPath}")\n set r to ((count of slides of d) as text) & "x" & (width of d as text)\n close d saving no\nend tell\nreturn r`,
+    );
+    expect(raw).toBe('2x1920');
   });
 });
