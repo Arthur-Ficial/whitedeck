@@ -1,8 +1,9 @@
 import { execFile } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, extname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFString, PDFHexString } from 'pdf-lib';
 import { dummyStringsIn } from '../theme/dummy.js';
 import { renderPptx } from './pptx.js';
 const execFileAsync = promisify(execFile);
@@ -95,6 +96,38 @@ export const readBackScript = (keyPath) => [
     `set AppleScript's text item delimiters to (ASCII character 30)`,
     'return out as text',
 ].join('\n');
+/** Exports a saved .key to PDF, so the link annotations Keynote really wrote can be counted. */
+export const exportPdfScript = (keyPath, pdfPath) => [
+    `with timeout of ${IMPORT_TIMEOUT_SECONDS} seconds`,
+    '  tell application id "com.apple.Keynote"',
+    ...openFrontDocument(resolve(keyPath)),
+    `    export d to POSIX file ${str(resolve(pdfPath))} as PDF with properties {export style:IndividualSlides, all stages:false}`,
+    '    close d saving no',
+    '  end tell',
+    'end timeout',
+].join('\n');
+/** Every link target of the deck's markdown, `[label](url)`. */
+export const deckLinkTargets = (deck) => {
+    const raw = JSON.stringify(deck.slides);
+    const targets = [...raw.matchAll(/\]\((https?:\/\/(?:[^()\s]|\([^()\s]*\))+)\)/g)].map((m) => m[1] ?? '');
+    return [...new Set(targets)];
+};
+/** The URI of every link annotation in a PDF. */
+export const linkUrisInPdf = async (bytes) => {
+    const pdf = await PDFDocument.load(bytes, { updateMetadata: false });
+    const uris = [];
+    for (const page of pdf.getPages()) {
+        const annots = page.node.lookupMaybe(PDFName.of('Annots'), PDFArray);
+        for (let i = 0; i < (annots?.size() ?? 0); i += 1) {
+            const annot = annots?.lookupMaybe(i, PDFDict);
+            const action = annot?.lookupMaybe(PDFName.of('A'), PDFDict);
+            const uri = action?.lookupMaybe(PDFName.of('URI'), PDFString, PDFHexString);
+            if (uri !== undefined)
+                uris.push(uri.decodeText());
+        }
+    }
+    return uris;
+};
 const URL_RE = /https?:\/\/[^\s)\]>"']+/g;
 /** URLs the deck's markdown shows as visible text (not link targets), e.g. a quoted question naming a site. */
 const visibleSourceUrls = (deck) => {
@@ -137,7 +170,7 @@ const keynoteIsRunning = async () => {
 const quitKeynoteIfIdle = async () => {
     await runAppleScript('tell application id "com.apple.Keynote"\n  if (count of documents) is 0 then quit\nend tell');
 };
-/** Reopen the saved .key and throw on any defect. No fallback, no warn-and-continue. */
+/** Reopen the saved .key and throw on any defect - dummy copy, a URL as text, a link that is not clickable. No fallback, no warn-and-continue. */
 export const verifyKey = async (deck, keyPath) => {
     const dump = await runAppleScript(readBackScript(keyPath));
     const slideTexts = dump.split(SLIDE_SEP);
@@ -145,6 +178,15 @@ export const verifyKey = async (deck, keyPath) => {
         throw new Error(`${keyPath}: ${slideTexts.length} slides in the .key, ${deck.slides.length} in the deck`);
     }
     const defects = keyDefects(slideTexts, deck);
+    /* Links: count what Keynote really wrote. Export the .key back to PDF and
+       require every markdown link target as a clickable annotation. */
+    const pdfPath = join(mkdtempSync(join(tmpdir(), 'whitedeck-keycheck-')), 'check.pdf');
+    await runAppleScript(exportPdfScript(keyPath, pdfPath));
+    const uris = new Set(await linkUrisInPdf(readFileSync(pdfPath)));
+    for (const target of deckLinkTargets(deck)) {
+        if (!uris.has(target))
+            defects.push(`link not clickable in the .key: ${target}`);
+    }
     if (defects.length > 0) {
         throw new Error(`${keyPath} is broken, ${defects.length} defect(s):\n${defects.join('\n')}`);
     }

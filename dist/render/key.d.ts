@@ -3,6 +3,12 @@ import type { Deck } from '../parse/deck.js';
 export declare const importScript: (pptxPath: string, outPath: string) => string;
 /** Reopens a saved .key and returns every visible text of every slide, slides separated by SLIDE_SEP. */
 export declare const readBackScript: (keyPath: string) => string;
+/** Exports a saved .key to PDF, so the link annotations Keynote really wrote can be counted. */
+export declare const exportPdfScript: (keyPath: string, pdfPath: string) => string;
+/** Every link target of the deck's markdown, `[label](url)`. */
+export declare const deckLinkTargets: (deck: Deck) => string[];
+/** The URI of every link annotation in a PDF. */
+export declare const linkUrisInPdf: (bytes: Uint8Array) => Promise<string[]>;
 /**
  * Defects on a finished .key, one message per problem. Two classes, both fatal:
  * the theme's dummy copy on a slide, and a URL printed as text that the
@@ -10,6 +16,6 @@ export declare const readBackScript: (keyPath: string) => string;
  */
 export declare const keyDefects: (slideTexts: readonly string[], deck: Deck) => string[];
 export declare const runAppleScript: (script: string, args?: readonly string[]) => Promise<string>;
-/** Reopen the saved .key and throw on any defect. No fallback, no warn-and-continue. */
+/** Reopen the saved .key and throw on any defect - dummy copy, a URL as text, a link that is not clickable. No fallback, no warn-and-continue. */
 export declare const verifyKey: (deck: Deck, keyPath: string) => Promise<void>;
 export declare const renderKey: (deck: Deck, outPath: string) => Promise<void>;

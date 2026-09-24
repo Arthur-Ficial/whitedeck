@@ -5,7 +5,8 @@ import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import { parseDeck } from '../parse/deck.js';
 import { THEME_DUMMY_STRINGS } from '../theme/dummy.js';
-import { importScript, keyDefects, readBackScript, renderKey, runAppleScript } from './key.js';
+import { PDFDocument, PDFName, PDFString } from 'pdf-lib';
+import { deckLinkTargets, exportPdfScript, importScript, keyDefects, linkUrisInPdf, readBackScript, renderKey, runAppleScript } from './key.js';
 import { renderPptx } from './pptx.js';
 
 const onMacWithKeynote = process.platform === 'darwin' && existsSync('/Applications/Keynote.app');
@@ -96,6 +97,32 @@ describe('keyDefects: the build-time guard on a finished .key', () => {
   it('allows a URL the markdown itself shows as text', () => {
     const q06 = parseDeck('<!-- _class: quote -->\n\n> LLMs.txt good/bad? (https://llmstxt.org/)\n> -- Q06');
     expect(keyDefects(['LLMs.txt good/bad? (https://llmstxt.org/)'], q06)).toEqual([]);
+  });
+});
+
+describe('link check: every markdown link must be a clickable annotation in the .key', () => {
+  it('collects every link target, deep links and encoded parentheses intact', () => {
+    expect(deckLinkTargets(deck)).toEqual([
+      'https://search.google.com/search-console/index?resource_id=sc-domain%3Aexample.com',
+      'https://web.dev/articles/vitals#:~:text=75th%20percentile',
+    ]);
+  });
+
+  it('reads the URI of every link annotation from a PDF', async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([1920, 1080]);
+    const link = pdf.context.obj({
+      Type: 'Annot', Subtype: 'Link', Rect: [0, 0, 100, 20],
+      A: { S: 'URI', URI: PDFString.of('https://web.dev/articles/vitals#:~:text=75th%20percentile') },
+    });
+    page.node.set(PDFName.of('Annots'), pdf.context.obj([pdf.context.register(link)]));
+    expect(await linkUrisInPdf(await pdf.save())).toEqual(['https://web.dev/articles/vitals#:~:text=75th%20percentile']);
+  });
+
+  it('exports the saved .key to PDF through the bundle id', () => {
+    const script = exportPdfScript('/tmp/x/Deck.key', '/tmp/x/check.pdf');
+    expect(script).toContain('export d to POSIX file "/tmp/x/check.pdf" as PDF');
+    expect(script).toContain('tell application id "com.apple.Keynote"');
   });
 });
 
